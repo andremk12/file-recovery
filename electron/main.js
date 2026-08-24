@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, ipcMain} from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -16,6 +16,7 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: true,
     },
   });
 
@@ -33,6 +34,15 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  ipcMain.handle("app:get-info", () => {
+    return {
+        version: app.getVersion(),
+        platform: process.platform,
+        electronVersion: process.version.electron
+    }
+  })
+  
+  
   createWindow();
 
   app.on("activate", () => {
