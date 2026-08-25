@@ -8,7 +8,7 @@ import {
 import AppLayout from "./components/layout/AppLayout"
 import History from "./pages/History"
 import Home from "./pages/Home"
-import Scan from "./pages/Scan"
+import Scan from "./pages/scan/Scan"
 import Settings from "./pages/Settings"
 
 function App() {

@@ -1,0 +1,188 @@
+.scan-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 28px;
+}
+
+.scan-header h1 {
+    margin: 0;
+    color: #172033;
+    font-size: 28px;
+}
+
+.scan-header p {
+    margin: 8px 0 0;
+    color: #64748b;
+}
+
+.refresh-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    color: #4338ca;
+    background: #ffffff;
+    border: 1px solid #dfe3eb;
+    border-radius: 10px;
+    cursor: pointer;
+    transition:
+        background-color 160ms ease,
+        border-color 160ms ease;
+}
+
+.refresh-button:hover:not(:disabled) {
+    background-color: #f5f3ff;
+    border-color: #a99efc;
+}
+
+.refresh-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.65;
+}
+
+.dive-grid {
+    display: grid;
+    grid-template-columns: repeat(
+        auto-fit,
+        minmax(320px, 1fr)
+    );
+    gap: 18px;
+}
+
+.drive-card {
+    padding: 22px;
+    background-color: #ffffff;
+    border:1px solid #e2e8f0;
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgb(15 23 42 / 5%);
+}
+
+.drive-card-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.drive-icon {
+    display: grid;
+    width: 48px;
+    height: 48px;
+    color: #5b4cf0;
+    background-color: #ede9fe;
+    border-radius: 13px;
+    place-items: center;
+}
+
+.drive-card h2 {
+    margin: 0;
+    color: #172033;
+    font-size: 18px;
+}
+
+.drive-card-header p {
+    margin: 4px 0 0;
+    color: #64748b;
+    font-size: 14px;
+}
+
+.drive-details {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 24px;
+}
+
+
+.drive-details span {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.drive-details strong {
+  color: #172033;
+  font-size: 14px;
+}
+
+.storage {
+  margin-top: 22px;
+}
+
+.storage-track {
+  height: 7px;
+  overflow: hidden;
+  background-color: #e8ecf3;
+  border-radius: 999px;
+}
+
+.storage-used {
+  height: 100%;
+  background-color: #6d5dfc;
+  border-radius: inherit;
+}
+
+.storage p {
+  margin: 8px 0 0;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.scan-status,
+.scan-error {
+  display: grid;
+  min-height: 220px;
+  padding: 32px;
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  place-items: center;
+  text-align: center;
+}
+
+.scan-status p,
+.scan-error p {
+  margin: 8px 0;
+  color: #64748b;
+}
+
+.scan-error {
+  border-color: #fecaca;
+  background-color: #fffafa;
+}
+
+.scan-error strong {
+  color: #b91c1c;
+}
+
+.scan-error button {
+  margin-top: 12px;
+  padding: 9px 14px;
+  color: #ffffff;
+  background-color: #dc2626;
+  border: 0;
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.loading-indicator {
+  width: 30px;
+  height: 30px;
+  border: 3px solid #ddd9fe;
+  border-top-color: #6d5dfc;
+  border-radius: 50%;
+  animation: spin 700ms linear infinite;
+}
+
+.is-spinning {
+  animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
