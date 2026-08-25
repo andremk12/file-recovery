@@ -1,0 +1,123 @@
+.app-shell {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    min-height: 100vh;
+    background-color: #f4f6fa;
+}
+
+.sidebar {
+    display: flex;
+    flex-direction: column;
+    padding: 24px 16px;
+    color: #e5e7eb;
+    background-color: #111827;
+    border-right: 1px solid #1f2937;
+}
+
+.sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 8px 24px;
+    border-bottom: 1px solid #293244;
+}
+
+.sidebar-brand-icon {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    color: #ffffff;
+    background-color: #6d5dfc;
+    border-radius: 12px;
+    place-items: center;
+}
+
+.sidebar-brand strong,
+.sidebar-brand span {
+    display: block;
+}
+
+.sidebar-brand span {
+    margin-top: 3px;
+    color: #94a3b8;
+    font-size: 12px;
+}
+
+.sidebar-navigation {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 24px;
+}
+
+.sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    color: #94a3b8;
+    text-decoration: none;
+    border-radius: 10px;
+    transition: 
+        color 160ms ease,
+        background-color 160ms ease ;
+}
+
+.sidebar-link:hover {
+    color: #ffffff;
+    background-color: #1f2937;
+}
+
+.sidebar-link:hover {
+    color: #ffffff;
+    background-color: #1f2937;
+}
+
+.sidebar-link.is-active {
+    color: #ffffff;
+    background-color: #6d5dfc;
+}
+
+.main-content {
+    min-width: 0;
+    padding: 32px;
+}
+
+.page {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.page-header {
+    margin-bottom: 24px;
+}
+
+.page-header h1 {
+    margin: 0;
+    color: #172033;
+    font-size: 28px;
+}
+
+.page-header p {
+    margin: 8px 0 0;
+    color: #64748b;
+}
+
+.info-card {
+    padding: 24px;
+    background-color: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(15 23 42 / 5%);
+}
+
+.info-card h2 {
+    margin-top: 0;
+    color: #172033;
+    font-size: 18px;
+}
+
+.info-card p:last-child {
+    margin-bottom: 0;
+}

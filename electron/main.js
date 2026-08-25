@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain} from "electron";
+import { app, BrowserWindow, ipcMain } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -14,15 +14,24 @@ function createWindow() {
     show: false,
 
     webPreferences: {
+      preload: path.join(__dirname, "preload.cjs"),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
     },
   });
 
+  mainWindow.webContents.on(
+    "preload-error",
+    (_event, preloadPath, error) => {
+      console.error("Erro ao carregar o preload:", preloadPath);
+      console.error(error);
+    },
+  );
+
   if (app.isPackaged) {
     mainWindow.loadFile(
-      path.join(__dirname, "../dist/index.html")
+      path.join(__dirname, "../dist/index.html"),
     );
   } else {
     mainWindow.loadURL("http://localhost:5173");
@@ -36,13 +45,12 @@ function createWindow() {
 app.whenReady().then(() => {
   ipcMain.handle("app:get-info", () => {
     return {
-        version: app.getVersion(),
-        platform: process.platform,
-        electronVersion: process.version.electron
-    }
-  })
-  
-  
+      version: app.getVersion(),
+      platform: process.platform,
+      electronVersion: process.versions.electron,
+    };
+  });
+
   createWindow();
 
   app.on("activate", () => {

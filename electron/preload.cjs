@@ -1,5 +1,5 @@
-const { contextBridge, ipcRender} = require("electron")
+const { contextBridge, ipcRenderer} = require("electron")
 
 contextBridge.exposeInMainWorld("desktopAPI", {
-    getAppInfo: () => ipcRender.invoke("app:get-info")
+    getAppInfo: () => ipcRenderer.invoke("app:get-info"),
 })

@@ -1,44 +1,31 @@
-import { useEffect, useState } from "react";
-import "./App.css"
+import {
+    HashRouter,
+    Navigate,
+    Route,
+    Routes
+} from "react-router-dom"
+
+import AppLayout from "./componets/layout/AppLayout"
+import History from "./pages/History"
+import Home from "./pages/Home"
+import Scan from "./pages/Scan"
+import Settings from "./pages/Settings"
 
 function App() {
-  const [appInfo, setAppInfo] = useState(null)
-  const [error, setError] = useState("")
-
-    useEffect(() => {
-      async function loadAppInfo() {
-        try {
-          if (!window.desktopAPI) {
-            throw new Error("A API do Electron não está disponível.")
-          }
-
-          const information = await window.desktopAPI.getAppInfo()
-          setAppInfo(information)
-        } catch (err) {
-          setError(err.message)
-        }
-      }
-
-      loadAppInfo()
-    }, [])
-
     return (
-      <main>
-         <h1>File Recovery</h1>
-         <p>Aplicação para recuperação de arquivos</p>
+        <HashRouter>
+            <Routes>
+                <Route element={<AppLayout/>}>
+                    <Route index element={<Home />}/>
+                    <Route path="scan" element={<Scan />}/>
+                    <Route path="history" element={<History />}/>
+                    <Route path="settings" element={<Settings />}/>
 
-         {appInfo && (
-           <section>
-              <h2>Informações de aplicação</h2>
-              <p>Versão: {appInfo.version}</p>
-              <p>Sistema: {appInfo.plataform}</p>
-              <p>Electron: {appInfo.electronVersion}</p>
-           </section>
-         )}
-
-         {error && <p>{error}</p>}
-      </main>
+                    <Route path="*" element={<Navigate to="/" replace/>}/>
+                </Route>
+            </Routes>
+        </HashRouter>
     )
 }
 
-export default App
+export default App;
