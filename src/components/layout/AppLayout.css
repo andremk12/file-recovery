@@ -68,11 +68,6 @@
     background-color: #1f2937;
 }
 
-.sidebar-link:hover {
-    color: #ffffff;
-    background-color: #1f2937;
-}
-
 .sidebar-link.is-active {
     color: #ffffff;
     background-color: #6d5dfc;

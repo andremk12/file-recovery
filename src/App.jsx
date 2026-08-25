@@ -5,7 +5,7 @@ import {
     Routes
 } from "react-router-dom"
 
-import AppLayout from "./componets/layout/AppLayout"
+import AppLayout from "./components/layout/AppLayout"
 import History from "./pages/History"
 import Home from "./pages/Home"
 import Scan from "./pages/Scan"
