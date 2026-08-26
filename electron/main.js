@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { registerDriveIpc } from "./ipc/driveIpc.js"
+import { registerDestinationIpc } from "./ipc/destinationIpc.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -53,6 +54,7 @@ app.whenReady().then(() => {
   });
 
   registerDriveIpc();
+  registerDestinationIpc();
 
   createWindow();
 

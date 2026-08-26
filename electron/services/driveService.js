@@ -13,14 +13,53 @@ const DRIVE_TYPES = {
   6: "ram",
 };
 
-const POWERSHELL_COMMAND = `
-    $ErrorActionPreference = "Stop"
+const POWERSHELL_COMMAND = `$ErrorActionPreference = "Stop"
 
+  $logicalDisks = @(
+    Get-CimInstance -ClassName Win32_LogicalDisk
+  )
 
-    Get-CimInstance -ClassName Win32_LogicalDisk |
-            Select-Object DeviceID, VolumeName, FileSystem, DriveType, Size, FreeSpace |
-            ConvertTo-Json -Compress
-`.trim()
+  try {
+    $partitions = @(
+      Get-Partition -ErrorAction Stop |
+        Where-Object { $null -ne $_.DriveLetter }
+    )
+  }
+  catch {
+    $partitions = @()
+  }
+
+  $results = foreach ($logicalDisk in $logicalDisks) {
+    $driveLetter = $logicalDisk.DeviceID.TrimEnd(":")
+
+    $partition = $partitions |
+      Where-Object {
+        $_.DriveLetter -eq $driveLetter
+      } |
+      Select-Object -First 1
+
+    $diskNumber = $null
+    $partitionNumber = $null
+
+    if ($null -ne $partition) {
+      $diskNumber = $partition.DiskNumber
+      $partitionNumber = $partition.PartitionNumber
+    }
+
+    [PSCustomObject]@{
+      DeviceID       = $logicalDisk.DeviceID
+      VolumeName     = $logicalDisk.VolumeName
+      FileSystem     = $logicalDisk.FileSystem
+      DriveType      = $logicalDisk.DriveType
+      Size           = $logicalDisk.Size
+      FreeSpace      = $logicalDisk.FreeSpace
+      DiskNumber     = $diskNumber
+      PartitionNumber = $partitionNumber
+    }
+  }
+
+  $results | ConvertTo-Json -Compress
+`.trim();
 
 function parseNullableNumber(value) {
     if (value === null || value === undefined) {
@@ -49,6 +88,8 @@ function normalizeDrive(drive) {
         totalBytes: parseNullableNumber(drive.Size),
         freeBytes: parseNullableNumber(drive.FreeSpace),
         isSystem: driveLetter === systemDrive,
+        diskNumber: parseNullableNumber(drive.diskNumber),
+        partitionNumber: parseNullableNumber(drive.partitionNumber,)
     }
 }
 

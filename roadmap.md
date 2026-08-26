@@ -20,11 +20,11 @@
 
 ## 2. Seleção segura do disco
 
-- [ ] Criar cards selecionáveis
-- [ ] Identificar disco do sistema
-- [ ] Exibir espaço total e disponível
-- [ ] Avisar sobre gravações no disco analisado
-- [ ] Impedir recuperação para o disco de origem
+- [x] Criar cards selecionáveis
+- [x] Identificar disco do sistema
+- [x] Exibir espaço total e disponível
+- [x] Avisar sobre gravações no disco analisado
+- [] Impedir recuperação para o disco de origem
 
 ## 3. Motor de varredura simulado
 

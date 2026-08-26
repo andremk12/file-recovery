@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { HardDrive, RefreshCw, CheckCircle2 } from "lucide-react";
+import { HardDrive, RefreshCw, CheckCircle2, FolderOpen, AlertTriangle } from "lucide-react";
 import "./Scan.css"
 
 const DRIVE_TYPE_LABELS = {
@@ -25,6 +25,16 @@ function formatBytes(bytes) {
     return `${gigabytes.toFixed(1)} GB`
 }
 
+    function extractDriveLetter(directoryPath) {
+        if (typeof directoryPath !== "string") {
+            return null
+        }
+
+        const match = directoryPath.match(/^[A-Za-z]:/);
+
+        return match ? match[0].toLocaleUpperCase() : null
+    }
+
 function calculateUsedPercentage(drive) {
     if (!drive.totalBytes || drive.freeBytes === null) {
         return 0
@@ -37,12 +47,81 @@ function calculateUsedPercentage(drive) {
 }
 
 
+
+
 function Scan() {
 
     const [drives, setDrives] = useState([])
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState("")
     const [selectedDriveId, setSelectedDriveId] = useState(null)
+
+    const [destinationPath, setDestinationPath] = useState("")
+    const [isSelectingDestination, setIsSelectingDestination] = useState(false)
+    const [destinationError, setDestinationError] = useState("")
+
+    async function handleSelectDestination() {
+    if (!selectedDriveId) {
+        setDestinationError(
+            "Selecione primeiro o disco que será analisado"
+        )
+        
+        return
+    }
+
+      if (!window.desktopAPI?.selectDestination) {
+    setDestinationError(
+      "A seleção de destino não está disponível.",
+    );
+
+    return;
+  }
+
+    setIsSelectingDestination(true)
+    setDestinationError("")
+
+    try {
+        const selectedPath = await window.desktopAPI.selectDestination()
+
+        if (!selectedPath) {
+            return
+        }
+
+        const destinationDriveLetter = extractDriveLetter(selectedPath)
+
+        if (!destinationDriveLetter) {
+            setDestinationPath("")
+            setDestinationError(
+                "Não foi possível identificar o disco da parte selecionada."
+            )
+
+            return
+        }
+
+        const sourceDriveLetter = selectedDriveId.letter.toLocaleUpperCase()
+
+        if (
+            destinationDriveLetter === sourceDriveLetter
+        ) {
+            setDestinationPath("");
+            setDestinationError(
+                `Escolha uma pasta fora do disco ${sourceDriveLetter}. ` +
+                "Gravar arquivos no disco analisado pode sobrescrever dados recuperáveis."
+            )
+
+            return
+        }
+
+        setDestinationPath(selectedPath)
+    } catch (selectionError) {
+        const message = selectionError instanceof Error ? selectionError.message : "Não foi possível selecionar o destino."
+
+        setDestinationPath("");
+        setDestinationError(message)
+    } finally {
+        setIsSelectingDestination(false)
+    }
+}
 
     const loadDrives = useCallback(async () => {
         setIsLoading(true);
@@ -87,6 +166,15 @@ function Scan() {
     const selectedDrive = drives.find(
         (drive) => drive.id === selectedDriveId,
     )
+
+    function handleSelectDrive(driveId) {
+        if (driveId !== selectedDriveId) {
+            setDestinationPath("")
+            setDestinationError("")
+        }
+
+        setSelectedDriveId(driveId)
+    }
    
 
     return (
@@ -158,7 +246,7 @@ function Scan() {
                                     key={drive.id}
                                     aria-pressed={selectedDriveId === drive.id}
                                     aria-label={`Selecionar disco ${drive.letter}`}
-                                    onClick={() => setSelectedDriveId(drive.id)}
+                                    onClick={() => handleSelectDrive(drive.id)}
                                     >
                                     <span className="drive-card-header">
                                         <span className="drive-icon">
@@ -244,6 +332,82 @@ function Scan() {
                         )}
                 </>      
             )}
+
+            {selectedDrive && (
+                    <section
+                        className="destination-section"
+                        aria-labelledby="destination-title"
+                    >
+                        <div className="destination-heading">
+                        <div className="destination-icon">
+                            <FolderOpen
+                            size={24}
+                            aria-hidden="true"
+                            />
+                        </div>
+
+                        <div>
+                            <h2 id="destination-title">
+                            Pasta de destino
+                            </h2>
+
+                            <p>
+                            Escolha uma pasta em outro disco para
+                            armazenar os arquivos recuperados.
+                            </p>
+                        </div>
+                        </div>
+
+                        <button
+                        type="button"
+                        className="destination-button"
+                        onClick={handleSelectDestination}
+                        disabled={isSelectingDestination}
+                        >
+                        <FolderOpen
+                            size={18}
+                            aria-hidden="true"
+                        />
+
+                        {isSelectingDestination
+                            ? "Abrindo..."
+                            : destinationPath
+                            ? "Alterar destino"
+                            : "Selecionar destino"}
+                        </button>
+
+                        {destinationPath && (
+                        <div
+                            className="destination-success"
+                            role="status"
+                        >
+                            <CheckCircle2
+                            size={20}
+                            aria-hidden="true"
+                            />
+
+                            <div>
+                            <strong>Destino selecionado</strong>
+                            <span>{destinationPath}</span>
+                            </div>
+                        </div>
+                        )}
+
+                        {destinationError && (
+                        <div
+                            className="destination-error"
+                            role="alert"
+                        >
+                            <AlertTriangle
+                            size={20}
+                            aria-hidden="true"
+                            />
+
+                            <span>{destinationError}</span>
+                        </div>
+                        )}
+                    </section>
+                    )}
 
         </section>
     )
