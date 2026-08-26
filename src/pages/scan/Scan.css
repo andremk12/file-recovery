@@ -42,7 +42,7 @@
     opacity: 0.65;
 }
 
-.dive-grid {
+.drive-grid {
     display: grid;
     grid-template-columns: repeat(
         auto-fit,
@@ -52,11 +52,113 @@
 }
 
 .drive-card {
-    padding: 22px;
-    background-color: #ffffff;
-    border:1px solid #e2e8f0;
-    border-radius: 16px;
-    box-shadow: 0 8px 24px rgb(15 23 42 / 5%);
+  width: 100%;
+  padding: 22px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 5%);
+  cursor: pointer;
+  appearance: none;
+
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.drive-card:hover {
+  border-color: #b5adfc ;
+  box-shadow: 0 12px 28px rgb(15 23 42 / 9%);
+  transform: translateY(-2px);
+}
+
+.drive-card:focus-visible {
+  outline: 3px solid rgba(109 93 252 / 25%);
+  outline-offset: 3px;
+}
+
+.drive-card.is-selected {
+  border-color: #6d5dfc;
+  box-shadow:
+  0 0 0 3px rgba(109 93 252 / 14%),
+  0 12px 28px rgb(15 23 42 / 8%);
+}
+
+.drive-heading {
+  min-width: 0;
+  flex: 1;
+}
+
+.drive-title {
+  color: #172033;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.drive-subtitle {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.drive-title,
+.drive-subtitle {
+  display: block;
+}
+
+.selected-icon {
+  flex-shrink: 0;
+  color: #6d5dfc;
+}
+
+.system-badge {
+  display: inline-flex;
+  margin-top: 16px;
+  padding: 5px 9px;
+  color: #92400e;
+  background-color: #fef3c7;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.storage-description {
+  display: block;
+  margin-top: 8px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.storage,
+.storage-track,
+.storage-description {
+  display: block;
+}
+
+.selection-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding: 16px 18px;
+  color: #4338ca;
+  background-color: #f5f3ff;
+  border: 1px solid #ddd6fe;
+  border-radius: 12px;
+}
+
+.selection-summary strong {
+  display: block;
+}
+
+.selection-summary p {
+  margin: 3px 0 0;
+  color: #64748b;
+  font-size: 13px;
 }
 
 .drive-card-header {
@@ -75,17 +177,6 @@
     place-items: center;
 }
 
-.drive-card h2 {
-    margin: 0;
-    color: #172033;
-    font-size: 18px;
-}
-
-.drive-card-header p {
-    margin: 4px 0 0;
-    color: #64748b;
-    font-size: 14px;
-}
 
 .drive-details {
     display: grid;
@@ -120,15 +211,10 @@
 }
 
 .storage-used {
+  display: block;
   height: 100%;
   background-color: #6d5dfc;
   border-radius: inherit;
-}
-
-.storage p {
-  margin: 8px 0 0;
-  color: #64748b;
-  font-size: 12px;
 }
 
 .scan-status,

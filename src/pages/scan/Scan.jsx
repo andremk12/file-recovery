@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { HardDrive, RefreshCw } from "lucide-react";
+import { HardDrive, RefreshCw, CheckCircle2 } from "lucide-react";
 import "./Scan.css"
 
 const DRIVE_TYPE_LABELS = {
@@ -42,6 +42,7 @@ function Scan() {
     const [drives, setDrives] = useState([])
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState("")
+    const [selectedDriveId, setSelectedDriveId] = useState(null)
 
     const loadDrives = useCallback(async () => {
         setIsLoading(true);
@@ -56,12 +57,24 @@ function Scan() {
 
             const result = await window.desktopAPI.getDrive()
 
-            setDrives(Array.isArray(result) ? result : [])
+            const avaliableDrives = Array.isArray(result) ? result : []
+
+            setDrives(avaliableDrives)
+
+            setSelectedDriveId((currentDriveId) => {
+                const driveStillExists = avaliableDrives.some(
+                    (drive) => drive.id === currentDriveId,
+                )
+
+                return driveStillExists ? currentDriveId : null
+            })
+
         } catch (loadError) {
             const message = loadError instanceof Error ? loadError.message : "Não foi possível consultar os discos"
 
             setError(message)
             setDrives([])
+            setSelectedDriveId(null)
         } finally {
             setIsLoading(false)
         }
@@ -70,6 +83,10 @@ function Scan() {
     useEffect(() => {
         loadDrives()
     }, [loadDrives])
+
+    const selectedDrive = drives.find(
+        (drive) => drive.id === selectedDriveId,
+    )
    
 
     return (
@@ -123,62 +140,109 @@ function Scan() {
             )}
             
             {!isLoading && !error && drives.length > 0 && (
-                <div className="drive-grid">
+               <>
+               <div 
+                    className="drive-grid"
+                    role="group"
+                    aria-label="Discos disponíveis"
+                >
                     {drives.map((drive) => {
                         const usedPercentage = calculateUsedPercentage(drive)
 
                         return (
-                            <article className="drive-card" key={drive.id}>
-                                <div className="drive-card-header">
-                                    <div className="drive-icon">
-                                        <HardDrive size = {24}/>
-                                    </div>
+                                <button
+                                    type="button"
+                                    className={`drive-card ${
+                                        selectedDriveId === drive.id ? "is-selected" : ""
+                                    }`}
+                                    key={drive.id}
+                                    aria-pressed={selectedDriveId === drive.id}
+                                    aria-label={`Selecionar disco ${drive.letter}`}
+                                    onClick={() => setSelectedDriveId(drive.id)}
+                                    >
+                                    <span className="drive-card-header">
+                                        <span className="drive-icon">
+                                        <HardDrive size={24} />
+                                        </span>
 
-                                    <div>
-                                        <h2>{drive.label}</h2>
-                                        <p>
-                                            {drive.letter} . {" "}
+                                        <span className="drive-heading">
+                                        <span className="drive-title">
+                                            {drive.label}
+                                        </span>
+
+                                        <span className="drive-subtitle">
+                                            {drive.letter} ·{" "}
                                             {DRIVE_TYPE_LABELS[drive.type] ||
-                                                DRIVE_TYPE_LABELS.unknown}
-                                        </p>
-                                    </div>
-                                </div>
+                                            DRIVE_TYPE_LABELS.unknown}
+                                        </span>
+                                        </span>
 
-                                <div className="drive-details">
-                                    <span>
+                                        {selectedDriveId === drive.id && (
+                                        <CheckCircle2
+                                            className="selected-icon"
+                                            size={22}
+                                            aria-hidden="true"
+                                        />
+                                        )}
+                                    </span>
+
+                                    {drive.isSystem && (
+                                        <span className="system-badge">
+                                        Disco do sistema
+                                        </span>
+                                    )}
+
+                                    <span className="drive-details">
+                                        <span>
                                         Sistema de arquivos
                                         <strong>{drive.fileSystem}</strong>
-                                    </span>
+                                        </span>
 
-                                    <span>
+                                        <span>
                                         Espaço disponível
-                                        <strong>
-                                            {formatBytes(drive.freeBytes)}
-                                        </strong>
+                                        <strong>{formatBytes(drive.freeBytes)}</strong>
+                                        </span>
                                     </span>
-                                </div>
 
-                                <div className="storage">
-                                    <div className="storage-track">
-                                         <div
+                                    <span className="storage">
+                                        <span className="storage-track">
+                                        <span
                                             className="storage-used"
-                                            style={{width: `${usedPercentage}%`}}
-                                         />
+                                            style={{ width: `${usedPercentage}%` }}
+                                        />
+                                        </span>
 
-                                         <p>
-                                            {formatBytes(drive.freeBytes)} disponíveis de{" "}
-                                            {formatBytes(drive.totalBytes)}
-                                         </p>
-
-                                     
-                                    </div>
-
-                                </div>
-                            </article>
+                                        <span className="storage-description">
+                                        {formatBytes(drive.freeBytes)} disponíveis de{" "}
+                                        {formatBytes(drive.totalBytes)}
+                                        </span>
+                                    </span>
+                                    </button>
                         )
                     })}
-                
+                    
                 </div>
+
+                    {selectedDrive && (
+                        <div className="selection-summary" role="status">
+                            <CheckCircle2
+                            size={22}
+                            aria-hidden="true"
+                            />
+
+                            <div>
+                            <strong>
+                                Disco {selectedDrive.letter} selecionado
+                            </strong>
+
+                            <p>
+                                {selectedDrive.label} ·{" "}
+                                {formatBytes(selectedDrive.totalBytes)}
+                            </p>
+                            </div>
+                        </div>
+                        )}
+                </>      
             )}
 
         </section>

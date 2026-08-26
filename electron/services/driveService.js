@@ -36,15 +36,19 @@ function parseNullableNumber(value) {
 function normalizeDrive(drive) {
     const typeCode = Number(drive.DriveType)
 
+    const driveLetter = drive.DeviceID?.toUpperCase()
+    const systemDrive = process.env.systemDrive?.toUpperCase()
+
     return {
-        id: drive.DeviceID,
-        letter: drive.DeviceID,
+        id: driveLetter,
+        letter: driveLetter,
         label: drive.VolumeName?.trim() || "Sem nome",
         fileSystem: drive.FileSystem || "Desconhecido",
         typeCode,
         type: DRIVE_TYPES[typeCode] || "unknown",
         totalBytes: parseNullableNumber(drive.Size),
         freeBytes: parseNullableNumber(drive.FreeSpace),
+        isSystem: driveLetter === systemDrive,
     }
 }
 
