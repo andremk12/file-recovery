@@ -32,7 +32,7 @@ function formatBytes(bytes) {
 
         const match = directoryPath.match(/^[A-Za-z]:/);
 
-        return match ? match[0].toLocaleUpperCase() : null
+        return match ? match[0].toUpperCase() : null
     }
 
 function calculateUsedPercentage(drive) {
@@ -60,8 +60,10 @@ function Scan() {
     const [isSelectingDestination, setIsSelectingDestination] = useState(false)
     const [destinationError, setDestinationError] = useState("")
 
+    const [destinationWarning, setDestinationWarning] = useState("")
+
     async function handleSelectDestination() {
-    if (!selectedDriveId) {
+    if (!selectedDrive) {
         setDestinationError(
             "Selecione primeiro o disco que será analisado"
         )
@@ -87,6 +89,8 @@ function Scan() {
             return
         }
 
+        setDestinationWarning("")
+
         const destinationDriveLetter = extractDriveLetter(selectedPath)
 
         if (!destinationDriveLetter) {
@@ -98,7 +102,7 @@ function Scan() {
             return
         }
 
-        const sourceDriveLetter = selectedDriveId.letter.toLocaleUpperCase()
+        const sourceDriveLetter = selectedDrive.letter.toUpperCase()
 
         if (
             destinationDriveLetter === sourceDriveLetter
@@ -112,12 +116,55 @@ function Scan() {
             return
         }
 
+        const refreshedResult = await window.desktopAPI.getDrive()
+
+        const refreshedDrives = Array.isArray(refreshedResult) ? refreshedResult : drives
+
+        setDrives(refreshedDrives)
+
+           const refreshedSource =
+                refreshedDrives.find(
+                    (drive) => drive.id === selectedDrive.id,
+      ) ?? selectedDrive;
+
+
+        const destinationDrive = refreshedDrives.find(
+                (drive) => 
+                    drive.letter?.toUpperCase() === destinationDriveLetter,
+        )
+
+        const sourceDiskNumber = refreshedSource.diskNumber
+
+        const destinationDiskNumber = destinationDrive?.diskNumber
+
+        const physicalDisksIdentified = Number.isInteger(sourceDiskNumber) && Number.isInteger(destinationDiskNumber)
+
+        if (physicalDisksIdentified && sourceDiskNumber == destinationDiskNumber) {
+            setDestinationPath("")
+            setDestinationError(
+                `${sourceDriveLetter} e ${destinationDriveLetter}` + `pertence ao mesmo dísco físico ${sourceDiskNumber}.`
+                + `Escolha outro HD, SSD ou pendrive` 
+            )
+
+            return
+        }
+
+        if (!physicalDisksIdentified) {
+            setDestinationWarning(
+                "Os Volumes são diferentes, mas não foi possível " +
+                "confirmar se pertencem a discos físicos diferentes"
+            )
+        }
+
+
         setDestinationPath(selectedPath)
     } catch (selectionError) {
         const message = selectionError instanceof Error ? selectionError.message : "Não foi possível selecionar o destino."
 
         setDestinationPath("");
+        setDestinationWarning("")
         setDestinationError(message)
+
     } finally {
         setIsSelectingDestination(false)
     }
@@ -125,6 +172,7 @@ function Scan() {
 
     const loadDrives = useCallback(async () => {
         setIsLoading(true);
+        setSelectedDriveId(false)
         setError("")
 
         try {
@@ -171,6 +219,7 @@ function Scan() {
         if (driveId !== selectedDriveId) {
             setDestinationPath("")
             setDestinationError("")
+            setDestinationWarning("")
         }
 
         setSelectedDriveId(driveId)
@@ -358,6 +407,19 @@ function Scan() {
                         </div>
                         </div>
 
+                        <div className="source-write-warning" role="note">
+                            <AlertTriangle size={21} aria-hidden="true"/>
+                            <div>
+                                Evite utilizar o disco {selectedDrive.letter}
+                            </div>
+
+                            <span>
+                                Criar, baixar ou instalar arquivos nesse disco pode
+                                sobrescrever dados que ainda poderiam ser recuperados.
+                            </span>
+
+                        </div>
+
                         <button
                         type="button"
                         className="destination-button"
@@ -392,6 +454,22 @@ function Scan() {
                             </div>
                         </div>
                         )}
+
+                        {destinationWarning && (
+                                <div
+                                    className="destination-warning"
+                                    role="status"
+                                >
+                                    <AlertTriangle
+                                        size={20}
+                                        aria-hidden="true"
+                                    />
+
+                                    <span>{destinationWarning}</span>
+                                </div>
+                        )
+
+                        }
 
                         {destinationError && (
                         <div
