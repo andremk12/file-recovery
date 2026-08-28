@@ -321,7 +321,7 @@
   color: #ffffff;
   background-color: #5b4cf0;
   border: 0;
-  border: 10px;
+  border-radius: 10px;
   cursor: pointer;
 }
 
@@ -401,4 +401,321 @@
 
 .destination-warning {
   font-size: 13px;
+}
+
+.scan-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  padding: 24px;
+  background-color: rgb(15 23 42 / 58%);
+  backdrop-filter: blur(3px);
+  place-items: center;
+}
+
+.scan-modal {
+  display: grid;
+  width: min(520px, 100%);
+  max-height: calc(100vh - 48px);
+  gap: 22px;
+  padding: 24px;
+  overflow-y: auto;
+  background-color: #ffffff;
+  border: 1px solid #dfe3eb;
+  border-radius: 18px;
+  box-shadow: 0 24px 70px rgb(15 23 42 / 28%);
+}
+
+.scan-modal-header,
+.scan-modal-heading {
+  display: flex;
+  align-items: flex-start;
+}
+
+.scan-modal-header {
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.scan-modal-heading {
+  gap: 14px;
+}
+
+.scan-modal-heading h2 {
+  margin: 0;
+  color: #172033;
+  font-size: 20px;
+}
+
+.scan-modal-heading p {
+  margin: 5px 0 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.scan-modal-icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  color: #5b4cf0;
+  background-color: #ede9fe;
+  border-radius: 13px;
+  place-items: center;
+}
+
+.scan-modal.is-completed .scan-modal-icon {
+  color: #15803d;
+  background-color: #dcfce7;
+}
+
+.scan-modal.is-cancelled .scan-modal-icon,
+.scan-modal.is-failed .scan-modal-icon {
+  color: #b91c1c;
+  background-color: #fee2e2;
+}
+
+.scan-modal-close {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  color: #64748b;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  place-items: center;
+}
+
+.scan-modal-close:hover:not(:disabled) {
+  color: #172033;
+  background-color: #f1f5f9;
+}
+
+.scan-modal-close:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.scan-modal-progress {
+  display: grid;
+  gap: 14px;
+}
+
+.scan-progress-information {
+  display: flex;
+  justify-content: space-between;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.scan-progress-information strong {
+  color: #4338ca;
+}
+
+.scan-modal-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.scan-modal-metrics div {
+  padding: 14px;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.scan-modal-metrics span,
+.scan-modal-metrics strong {
+  display: block;
+}
+
+.scan-modal-metrics span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.scan-modal-metrics strong {
+  margin-top: 5px;
+  color: #172033;
+  font-size: 17px;
+}
+
+.scan-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.close-scan-button {
+  padding: 10px 18px;
+  color: #ffffff;
+  background-color: #5b4cf0;
+  border: 0;
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.close-scan-button:hover {
+  background-color: #4938dd;
+}
+
+.scan-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.start-scan-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 16px;
+  color: #ffffff;
+  border: 0;
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    opacity 160ms ease;
+}
+
+.cancel-scan-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 11px;
+  color: white;
+  background-color: transparent;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.cancel-scan-button:hover:not(:disabled) {
+  background-color: #fef2f2;
+  border-color: #fca5a5;
+}
+
+.cancel-scan-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+
+.start-scan-button {
+  background-color: #5b4cf0;
+}
+
+.start-scan-button:hover:not(:disabled) {
+  background-color: #4938dd;
+}
+
+.cancel-scan-button {
+  background-color: #dc2626;
+}
+
+.cancel-scan-button:hover:not(:disabled) {
+  background-color: #b91c1c;
+}
+
+.start-scan-button:disabled,
+.cancel-scan-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.scan-progress-track {
+  height: 9px;
+  overflow: hidden;
+  background-color: #e2e8f0;
+  border-radius: 999px;
+}
+
+.scan-progress-value {
+  height: 100%;
+  background-color: #5b4cf0;
+  border-radius: inherit;
+  transition: width 300ms ease;
+}
+
+.scan-modal.is-completed .scan-progress-value {
+  background-color: #16a34a;
+}
+
+.scan-modal.is-cancelled .scan-progress-value {
+  background-color: #d97706;
+}
+
+.scan-modal.is-failed .scan-progress-value {
+  background-color: #dc2626;
+}
+
+.scan-operation-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 13px 15px;
+  color: #b91c1c;
+  background-color: #fff7f7;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.scan-operation-error svg {
+  flex-shrink: 0;
+}
+
+.drive-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+  transform: none;
+}
+
+.drive-card:disabled:hover {
+  border-color: #e2e8f0;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 5%);
+  transform: none;
+}
+
+@media (max-width: 600px) {
+  .scan-modal-backdrop {
+    padding: 12px;
+  }
+
+  .scan-modal {
+    gap: 18px;
+    padding: 18px;
+  }
+
+  .scan-modal-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .scan-modal-header {
+    gap: 12px;
+  }
+
+  .scan-actions,
+  .scan-modal-actions {
+    flex-direction: column;
+  }
+
+  .start-scan-button,
+  .cancel-scan-button,
+  .close-scan-button {
+    width: 100%;
+  }
 }

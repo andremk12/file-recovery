@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { HardDrive, RefreshCw, CheckCircle2, FolderOpen, AlertTriangle } from "lucide-react";
+import { HardDrive, RefreshCw, CheckCircle2, FolderOpen, AlertTriangle, XCircle, X, Search } from "lucide-react";
 import "./Scan.css"
 
 const DRIVE_TYPE_LABELS = {
@@ -10,6 +10,28 @@ const DRIVE_TYPE_LABELS = {
     ram: "Disco em memória",
     unknown: "Tipo desconhecido"
 }
+
+const INITIAL_SCAN_STATE = {
+    scanId: null,
+    status: "idle",
+    progress: 0,
+    phase: "",
+    message: "",
+    filesFound: 0,
+    elapsedMS: 0,
+}
+
+function formatElapsedTime(milliseconds) {
+    const totalSeconds = Math.floor(
+        milliseconds / 1000,
+    )
+
+    const minutes = Math.floor(totalSeconds / 60)
+    const seconds = totalSeconds % 60
+
+    return minutes > 0 ? `${minutes}min ${seconds}s` : `${seconds}s`
+}
+
 
 function formatBytes(bytes) {
     if (bytes === null || bytes === undefined) {
@@ -62,6 +84,17 @@ function Scan() {
 
     const [destinationWarning, setDestinationWarning] = useState("")
 
+    
+    const [isScanModalOpen, setIsScanModalOpen] = useState(false);
+
+
+    const [scanState, setScanState] = useState(
+        () => ({...INITIAL_SCAN_STATE})
+    )
+
+    const [scanError, setScanError] = useState("")
+
+ 
     async function handleSelectDestination() {
     if (!selectedDrive) {
         setDestinationError(
@@ -211,9 +244,86 @@ function Scan() {
         loadDrives()
     }, [loadDrives])
 
+    useEffect(() => {
+            if (!window.desktopAPI?.onScanUpdate) {
+                return undefined;
+            }
+
+            const removeListener =
+                window.desktopAPI.onScanUpdate((update) => {
+                setScanState((currentState) => {
+                    if (
+                    currentState.scanId &&
+                    update.scanId !== currentState.scanId
+                    ) {
+                    return currentState;
+                    }
+
+                    let message = update.message;
+
+                    if (
+                    update.type === "completed" &&
+                    !message
+                    ) {
+                    message = "Varredura concluída.";
+                    }
+
+                    if (
+                    update.type === "cancelled" &&
+                    !message
+                    ) {
+                    message = "Varredura cancelada.";
+                    }
+
+                    return {
+                    ...currentState,
+                    scanId: update.scanId,
+                    status: update.status,
+                    progress:
+                        update.progress ??
+                        currentState.progress,
+                    phase:
+                        update.phase ??
+                        currentState.phase,
+                    message:
+                        message ??
+                        currentState.message,
+                    filesFound:
+                        update.filesFound ??
+                        currentState.filesFound,
+                    elapsedMs:
+                        update.elapsedMs ??
+                        update.durationMs ??
+                        currentState.elapsedMs,
+                    };
+                });
+
+                if (update.type === "failed") {
+                    setScanError(
+                    update.message ||
+                        "A varredura falhou.",
+                    );
+                }
+                });
+
+            return removeListener;
+            }, []);
+
     const selectedDrive = drives.find(
         (drive) => drive.id === selectedDriveId,
     )
+
+       const isScanActive = [
+        "starting",
+        "running",
+        "cancelling"
+    ].includes(scanState.status)
+
+    const canStartScan = Boolean(
+        selectedDrive && destinationPath &&
+        !destinationError && !isScanActive
+    )
+
 
     function handleSelectDrive(driveId) {
         if (driveId !== selectedDriveId) {
@@ -224,7 +334,148 @@ function Scan() {
 
         setSelectedDriveId(driveId)
     }
-   
+
+    async function handleStartScan() {
+  if (!canStartScan) {
+    setScanError(
+      "Selecione a origem e a pasta de destino.",
+    );
+
+    return;
+  }
+
+  if (!window.desktopAPI?.startScan) {
+    setScanError(
+      "A varredura não está disponível.",
+    );
+
+    return;
+  }
+  setIsScanModalOpen(true)
+  setScanError("");
+
+  setScanState({
+    ...INITIAL_SCAN_STATE,
+    status: "starting",
+    message: "Iniciando a varredura...",
+  });
+
+  try {
+    const startedScan =
+      await window.desktopAPI.startScan({
+        sourceDrive: selectedDrive.letter,
+        destinationPath,
+        mode: "regular",
+      });
+
+    setScanState((currentState) => ({
+      ...currentState,
+      scanId: startedScan.scanId,
+      status: startedScan.status,
+      progress: startedScan.progress ?? 0,
+      filesFound:
+        startedScan.filesFound ?? 0,
+    }));
+  } catch (startError) {
+    const message =
+      startError instanceof Error
+        ? startError.message
+        : "Não foi possível iniciar a varredura.";
+
+    setScanState({
+      ...INITIAL_SCAN_STATE,
+      status: "failed",
+      message,
+    });
+
+    setScanError(message);
+  }
+}
+
+async function handleCancelScan() {
+  if (
+    !scanState.scanId ||
+    !window.desktopAPI?.cancelScan
+  ) {
+    return;
+  }
+
+  setScanError("");
+
+  setScanState((currentState) => ({
+    ...currentState,
+    status: "cancelling",
+    message: "Cancelando a varredura...",
+  }));
+
+  try {
+    const result =
+      await window.desktopAPI.cancelScan(
+        scanState.scanId,
+      );
+
+    if (!result.cancelled) {
+      setScanError(
+        result.message ||
+          "Não foi possível cancelar.",
+      );
+    }
+  } catch (cancelError) {
+    setScanState((currentState) => ({
+      ...currentState,
+      status: "running",
+    }));
+
+    setScanError(
+      cancelError instanceof Error
+        ? cancelError.message
+        : "Não foi possível cancelar.",
+    );
+  }
+}
+
+function handleCloseScanModal() {
+    if (isScanActive) {
+        return
+    }
+
+    setIsScanModalOpen(false)
+}
+
+useEffect(() => {
+  if (!isScanModalOpen) {
+    return undefined;
+  }
+
+  const previousOverflow =
+    document.body.style.overflow;
+
+  document.body.style.overflow = "hidden";
+
+  function handleKeyDown(event) {
+    if (
+      event.key === "Escape" &&
+      !isScanActive
+    ) {
+      setIsScanModalOpen(false);
+    }
+  }
+
+  window.addEventListener(
+    "keydown",
+    handleKeyDown,
+  );
+
+  return () => {
+    document.body.style.overflow =
+      previousOverflow;
+
+    window.removeEventListener(
+      "keydown",
+      handleKeyDown,
+    );
+  };
+}, [isScanModalOpen, isScanActive]);
 
     return (
         <section className="page">
@@ -420,24 +671,40 @@ function Scan() {
 
                         </div>
 
-                        <button
-                        type="button"
-                        className="destination-button"
-                        onClick={handleSelectDestination}
-                        disabled={isSelectingDestination}
-                        >
-                        <FolderOpen
-                            size={18}
-                            aria-hidden="true"
-                        />
+                      <button
+                            type="button"
+                            className="destination-button"
+                            onClick={handleSelectDestination}
+                            disabled={
+                                isSelectingDestination ||
+                                isScanActive
+                            }
+                            >
+                            <FolderOpen size={18} aria-hidden="true" />
 
-                        {isSelectingDestination
-                            ? "Abrindo..."
-                            : destinationPath
-                            ? "Alterar destino"
-                            : "Selecionar destino"}
-                        </button>
+                            {isSelectingDestination
+                                ? "Abrindo..."
+                                : destinationPath
+                                ? "Alterar destino"
+                                : "Selecionar destino"}
+                            </button>
 
+                            <div className="scan-actions">
+                            <button
+                                type="button"
+                                className="start-scan-button"
+                                onClick={handleStartScan}
+                                disabled={!canStartScan}
+                            >
+                                <Search size={18} aria-hidden="true" />
+
+                                {scanState.status === "idle"
+                                ? "Iniciar varredura"
+                                : "Executar novamente"}
+                            </button>
+                            </div>
+
+                    
                         {destinationPath && (
                         <div
                             className="destination-success"
@@ -454,6 +721,7 @@ function Scan() {
                             </div>
                         </div>
                         )}
+
 
                         {destinationWarning && (
                                 <div
@@ -486,6 +754,174 @@ function Scan() {
                         )}
                     </section>
                     )}
+
+         {isScanModalOpen && (
+            <div
+                className="scan-modal-backdrop"
+                onMouseDown={(event) => {
+                if (
+                    event.target === event.currentTarget &&
+                    !isScanActive
+                ) {
+                    handleCloseScanModal();
+                }
+                }}
+            >
+            <section
+            className={`scan-modal is-${scanState.status}`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="scan-modal-title"
+            aria-describedby="scan-modal-description"
+            >
+            <header className="scan-modal-header">
+                <div className="scan-modal-heading">
+                <div className="scan-modal-icon">
+                    {scanState.status === "completed" && (
+                    <CheckCircle2
+                        size={25}
+                        aria-hidden="true"
+                    />
+                    )}
+
+                    {scanState.status === "cancelled" && (
+                    <XCircle
+                        size={25}
+                        aria-hidden="true"
+                    />
+                    )}
+
+                    {scanState.status === "failed" && (
+                    <AlertTriangle
+                        size={25}
+                        aria-hidden="true"
+                    />
+                    )}
+
+                    {isScanActive && (
+                    <RefreshCw
+                        size={25}
+                        className="is-spinning"
+                        aria-hidden="true"
+                    />
+                    )}
+                </div>
+
+                <div>
+                    <h2 id="scan-modal-title">
+                    Varredura de arquivos
+                    </h2>
+
+                    <p id="scan-modal-description">
+                    {scanState.message ||
+                        "Preparando a varredura..."}
+                    </p>
+                </div>
+                </div>
+
+                <button
+                type="button"
+                className="scan-modal-close"
+                onClick={handleCloseScanModal}
+                disabled={isScanActive}
+                aria-label="Fechar varredura"
+                >
+                <X size={20} />
+                </button>
+            </header>
+
+            <div
+                className="scan-modal-progress"
+                aria-live="polite"
+            >
+                <div className="scan-progress-information">
+                <span>Progresso</span>
+                <strong>
+                    {scanState.progress}%
+                </strong>
+                </div>
+
+                <div
+                className="scan-progress-track"
+                role="progressbar"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                aria-valuenow={scanState.progress}
+                >
+                <div
+                    className="scan-progress-value"
+                    style={{
+                    width: `${scanState.progress}%`,
+                    }}
+                />
+                </div>
+
+                <div className="scan-modal-metrics">
+                <div>
+                    <span>Arquivos encontrados</span>
+                    <strong>
+                    {scanState.filesFound}
+                    </strong>
+                </div>
+
+                <div>
+                    <span>Tempo decorrido</span>
+                    <strong>
+                    {formatElapsedTime(
+                        scanState.elapsedMs,
+                    )}
+                    </strong>
+                </div>
+                </div>
+            </div>
+
+            {scanError && (
+                <div
+                className="scan-operation-error"
+                role="alert"
+                >
+                <AlertTriangle
+                    size={20}
+                    aria-hidden="true"
+                />
+
+                <span>{scanError}</span>
+                </div>
+            )}
+
+            <footer className="scan-modal-actions">
+                {isScanActive ? (
+                <button
+                    type="button"
+                    className="cancel-scan-button"
+                    onClick={handleCancelScan}
+                    disabled={
+                    scanState.status === "cancelling" ||
+                    !scanState.scanId
+                    }
+                >
+                    <XCircle
+                    size={18}
+                    aria-hidden="true"
+                    />
+
+                    {scanState.status === "cancelling"
+                    ? "Cancelando..."
+                    : "Cancelar"}
+                </button>
+                ) : (
+                <button
+                    type="button"
+                    className="close-scan-button"
+                    onClick={handleCloseScanModal}
+                >
+                    Fechar
+                </button>
+                )}
+            </footer>
+            </section>
+        </div>
+        )}
 
         </section>
     )
