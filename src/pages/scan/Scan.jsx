@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { HardDrive, RefreshCw, CheckCircle2, FolderOpen, AlertTriangle, XCircle, X, Search } from "lucide-react";
+import { HardDrive, RefreshCw, CheckCircle2, FolderOpen, AlertTriangle, XCircle, X, Search, FileText } from "lucide-react";
 import "./Scan.css"
 
 const DRIVE_TYPE_LABELS = {
@@ -18,7 +18,37 @@ const INITIAL_SCAN_STATE = {
     phase: "",
     message: "",
     filesFound: 0,
-    elapsedMS: 0,
+    elapsedMs: 0,
+    results: [],
+}
+
+const RECOVERABILITY_LABELS = {
+    high: "Alta",
+    medium: "Média",
+    low: "Baixa"
+}
+
+function formatFileSize(bytes) {
+    if (!Number.isFinite(bytes) || bytes < 0) {
+        return "Indisponível"
+    }
+
+    const units = ["B", "KB", "MB", "GB"]
+    let value = bytes
+    let unitIndex = 0
+
+    while (
+        value >= 1024 && unitIndex < units.length - 1
+    ) {
+        value /= 1024
+        unitIndex += 1
+    }
+
+    const decimals = unitIndex === 0 ? 0 : 1
+
+    return `${value.toFixed(decimals)} ${
+        units[unitIndex]
+    }`
 }
 
 function formatElapsedTime(milliseconds) {
@@ -86,6 +116,7 @@ function Scan() {
 
     
     const [isScanModalOpen, setIsScanModalOpen] = useState(false);
+    const [showScanResults, setShowScanResults,] = useState(false)
 
 
     const [scanState, setScanState] = useState(
@@ -295,6 +326,7 @@ function Scan() {
                         update.elapsedMs ??
                         update.durationMs ??
                         currentState.elapsedMs,
+                    results: Array.isArray(update.results) ? update.results : currentState.results
                     };
                 });
 
@@ -351,6 +383,7 @@ function Scan() {
 
     return;
   }
+  setShowScanResults(false)
   setIsScanModalOpen(true)
   setScanError("");
 
@@ -830,6 +863,7 @@ useEffect(() => {
                 </button>
             </header>
 
+          {!showScanResults && (
             <div
                 className="scan-modal-progress"
                 aria-live="polite"
@@ -874,6 +908,71 @@ useEffect(() => {
                 </div>
                 </div>
             </div>
+         )}
+
+         {showScanResults && (
+            <div className="scan-results">
+                <div className="scan-results-header">
+                    <div>
+                        <h3>Arquivos encontrados</h3>
+                         <p>
+                            Resultados gerados pela varredura
+                            simulada.
+                         </p>
+                    </div>
+
+                    <span className="results-count">
+                        {scanState.results.length}
+                    </span>
+                </div>
+
+                <div className="scan-results-list">
+                    {scanState.results.map((file) => (
+                        <article
+                            className = "scan-result-item"
+                            key = {file.id}
+                        >
+                            <div className="scan-result-icon">
+                                <FileText
+                                    size={20}
+                                    aria-hidden="true"
+                                />
+                            </div>
+
+
+                            <div className="scan-result-information">
+                                <strong>{file.name}</strong>
+
+                                <span title={file.originalPath}>
+                                    {file.originalPath}
+                                </span>
+                            </div>
+
+                            <div className="scan-result-metadata">
+                                <strong>
+                                    {formatFileSize(file.sizeBytes)}
+                                </strong>
+
+
+                                <span
+                                    className={`recoverability is-${file.recoverability}`}
+                                >
+                                    {
+                                        RECOVERABILITY_LABELS[
+                                            file.recoverability
+                                        ] || "Desconhecida"
+                                    } 
+                                </span>
+                            </div>
+
+                        </article>
+                    ))}
+                </div>
+
+            </div>
+         )
+
+         }
 
             {scanError && (
                 <div
@@ -890,35 +989,82 @@ useEffect(() => {
             )}
 
             <footer className="scan-modal-actions">
-                {isScanActive ? (
-                <button
+                {isScanActive && (
+                    <button
                     type="button"
                     className="cancel-scan-button"
                     onClick={handleCancelScan}
                     disabled={
-                    scanState.status === "cancelling" ||
-                    !scanState.scanId
+                        scanState.status === "cancelling" ||
+                        !scanState.scanId
                     }
-                >
-                    <XCircle
-                    size={18}
-                    aria-hidden="true"
-                    />
+                    >
+                    <XCircle size={15} aria-hidden="true" />
 
                     {scanState.status === "cancelling"
-                    ? "Cancelando..."
-                    : "Cancelar"}
-                </button>
-                ) : (
-                <button
-                    type="button"
-                    className="close-scan-button"
-                    onClick={handleCloseScanModal}
-                >
-                    Fechar
-                </button>
+                        ? "Cancelando..."
+                        : "Cancelar"}
+                    </button>
                 )}
-            </footer>
+
+                {!isScanActive &&
+                    scanState.status === "completed" &&
+                    !showScanResults && (
+                    <>
+                        <button
+                        type="button"
+                        className="modal-secondary-button"
+                        onClick={handleCloseScanModal}
+                        >
+                        Fechar
+                        </button>
+
+                        <button
+                        type="button"
+                        className="view-results-button"
+                        onClick={() =>
+                            setShowScanResults(true)
+                        }
+                        >
+                        Ver arquivos encontrados
+                        </button>
+                    </>
+                    )}
+
+                {!isScanActive && showScanResults && (
+                    <>
+                    <button
+                        type="button"
+                        className="modal-secondary-button"
+                        onClick={() =>
+                        setShowScanResults(false)
+                        }
+                    >
+                        Voltar
+                    </button>
+
+                    <button
+                        type="button"
+                        className="close-scan-button"
+                        onClick={handleCloseScanModal}
+                    >
+                        Fechar
+                    </button>
+                    </>
+                )}
+
+                {!isScanActive &&
+                    scanState.status !== "completed" &&
+                    !showScanResults && (
+                    <button
+                        type="button"
+                        className="close-scan-button"
+                        onClick={handleCloseScanModal}
+                    >
+                        Fechar
+                    </button>
+                    )}
+                </footer>
             </section>
         </div>
         )}

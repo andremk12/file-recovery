@@ -1,6 +1,65 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 
+const SIMULATED_FILE_TEMPLATES = [
+  {
+    name: "Projeto-final.docx",
+    directory: "Users\\Public\\Documents",
+    sizeBytes: 482304,
+    category: "document",
+    recoverability: "high",
+  },
+  {
+    name: "Relatorio-financeiro.xlsx",
+    directory: "Users\\Public\\Documents",
+    sizeBytes: 756224,
+    category: "spreadsheet",
+    recoverability: "high",
+  },
+  {
+    name: "Apresentacao.pptx",
+    directory: "Users\\Public\\Desktop",
+    sizeBytes: 3248128,
+    category: "presentation",
+    recoverability: "medium",
+  },
+  {
+    name: "Foto-evento.jpg",
+    directory: "Users\\Public\\Pictures",
+    sizeBytes: 2457600,
+    category: "image",
+    recoverability: "high",
+  },
+  {
+    name: "Captura-de-tela.png",
+    directory: "Users\\Public\\Pictures",
+    sizeBytes: 1348608,
+    category: "image",
+    recoverability: "medium",
+  },
+  {
+    name: "Backup-projeto.zip",
+    directory: "Users\\Public\\Downloads",
+    sizeBytes: 15728640,
+    category: "archive",
+    recoverability: "low",
+  },
+  {
+    name: "Codigo-fonte.js",
+    directory: "Users\\Public\\Documents\\Projetos",
+    sizeBytes: 18432,
+    category: "code",
+    recoverability: "high",
+  },
+  {
+    name: "Video-apresentacao.mp4",
+    directory: "Users\\Public\\Videos",
+    sizeBytes: 52428800,
+    category: "video",
+    recoverability: "medium",
+  },
+];
+
 const ALLOWED_SCAN_MODES = new Set([
   "regular",
   "extensive",
@@ -50,6 +109,22 @@ const SIMULATION_STEPS = [
     delayMs: 700,
   },
 ];
+
+function createSimulatedResults(scanId, sourceDrive) {
+  return SIMULATED_FILE_TEMPLATES.map(
+    (file, index) => ({
+      id: `${scanId}-${index + 1}`,
+      name: file.name,
+      originalPath:
+       `${sourceDrive}\\${file.directory}` + `\\${file.name}`,
+       sizeBytes: file.sizeBytes,
+       category: file.category,
+       recoverability: file.recoverability,
+       status: "recoverable",
+    })
+  )
+}
+
 
 function validateScanRequest(input) {
   if (!input || typeof input !== "object") {
@@ -162,6 +237,12 @@ export function createSimulatedScan(input) {
   const request = validateScanRequest(input);
 
   const scanId = randomUUID();
+
+  const results = createSimulatedResults(
+    scanId,
+    request.sourceDrive
+  )
+
   const controller = new AbortController();
   const scan = new EventEmitter();
 
@@ -231,6 +312,7 @@ export function createSimulatedScan(input) {
       }
 
       status = "completed";
+      filesFound = results.length
 
       scan.emit("completed", {
         scanId,
@@ -238,6 +320,7 @@ export function createSimulatedScan(input) {
         progress: 100,
         filesFound,
         durationMs: Date.now() - startedAt,
+        results
       });
     } catch (error) {
       if (error?.name === "AbortError") {
