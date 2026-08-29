@@ -604,6 +604,7 @@
 }
 
 .cancel-scan-button:hover:not(:disabled) {
+  color: #991b1b;
   background-color: #fef2f2;
   border-color: #fca5a5;
 }
@@ -846,12 +847,6 @@
   color: #b91c1c;
 }
 
-.scan-modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
 .view-results-button,
 .modal-secondary-button {
   padding: 10px 15px;
@@ -890,5 +885,326 @@
   .scan-result-metadata {
     grid-column: 2;
     text-align: left;
+  }
+}
+
+/* Configuração exibida na página */
+
+.recovery-configuration {
+  display: grid;
+  gap: 12px;
+}
+
+.configure-recovery-button {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 15px;
+  color: #4338ca;
+  background-color: #f5f3ff;
+  border: 1px solid #c4b5fd;
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.configure-recovery-button:hover:not(:disabled) {
+  color: #3730a3;
+  background-color: #ede9fe;
+  border-color: #a78bfa;
+}
+
+.configure-recovery-button:focus-visible {
+  outline: 3px solid rgb(109 93 252 / 25%);
+  outline-offset: 3px;
+}
+
+.configure-recovery-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Resumo apresentado após a validação */
+
+.recovery-configuration-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 13px 15px;
+  color: #166534;
+  background-color: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+}
+
+.recovery-configuration-summary svg {
+  flex-shrink: 0;
+}
+
+.recovery-configuration-summary div {
+  min-width: 0;
+}
+
+.recovery-configuration-summary strong,
+.recovery-configuration-summary span {
+  display: block;
+}
+
+.recovery-configuration-summary span {
+  margin-top: 3px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+/* Modal de configuração */
+
+.recovery-config-modal {
+  display: grid;
+  width: min(560px, 100%);
+  max-height: calc(100vh - 48px);
+  gap: 22px;
+  padding: 24px;
+  overflow-y: auto;
+  background-color: #ffffff;
+  border: 1px solid #dfe3eb;
+  border-radius: 18px;
+  box-shadow:
+    0 24px 70px rgb(15 23 42 / 28%);
+  box-sizing: border-box;
+}
+
+/* Conteúdo interno do modal */
+
+.recovery-options {
+  display: grid;
+  gap: 20px;
+}
+
+.mode-options {
+  display: grid;
+  grid-template-columns: repeat(
+    2,
+    minmax(0, 1fr)
+  );
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.mode-options legend {
+  grid-column: 1 / -1;
+  margin-bottom: 2px;
+  color: #334155;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mode-option {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px;
+  background-color: #ffffff;
+  border: 1px solid #dfe3eb;
+  border-radius: 12px;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.mode-option:hover {
+  background-color: #fafafa;
+  border-color: #c4b5fd;
+}
+
+.mode-option.is-selected {
+  background-color: #f5f3ff;
+  border-color: #6d5dfc;
+  box-shadow:
+    0 0 0 2px rgb(109 93 252 / 10%);
+}
+
+.mode-option input {
+  margin: 3px 0 0;
+  flex-shrink: 0;
+  accent-color: #5b4cf0;
+}
+
+.mode-option span,
+.mode-option strong,
+.mode-option small {
+  display: block;
+}
+
+.mode-option span {
+  min-width: 0;
+}
+
+.mode-option strong {
+  color: #172033;
+  font-size: 14px;
+}
+
+.mode-option small {
+  margin-top: 5px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* Seleção dos tipos de arquivo */
+
+.file-group-field {
+  display: grid;
+  gap: 7px;
+  color: #334155;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.file-group-field select {
+  width: 100%;
+  padding: 11px 12px;
+  color: #172033;
+  background-color: #ffffff;
+  border: 1px solid #dfe3eb;
+  border-radius: 9px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.file-group-field select:hover {
+  border-color: #c4b5fd;
+}
+
+.file-group-field select:focus-visible {
+  outline: 3px solid rgb(109 93 252 / 20%);
+  outline-offset: 2px;
+  border-color: #6d5dfc;
+}
+
+.file-group-field small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+/* Erro de validação */
+
+.recovery-command-error {
+  padding: 13px 15px;
+  color: #b91c1c;
+  background-color: #fff7f7;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+/* Rodapé do modal */
+
+.recovery-config-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 18px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.prepare-recovery-button {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  color: #ffffff;
+  background-color: #5b4cf0;
+  border: 1px solid #5b4cf0;
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    opacity 160ms ease;
+}
+
+.prepare-recovery-button:hover:not(:disabled) {
+  background-color: #4938dd;
+  border-color: #4938dd;
+}
+
+.prepare-recovery-button:focus-visible {
+  outline: 3px solid rgb(109 93 252 / 25%);
+  outline-offset: 3px;
+}
+
+.prepare-recovery-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+/* Responsividade */
+
+@media (max-width: 600px) {
+  .recovery-config-modal {
+    width: 100%;
+    max-height: calc(100vh - 24px);
+    gap: 18px;
+    padding: 18px;
+  }
+
+  .mode-options {
+    grid-template-columns: 1fr;
+  }
+
+  .recovery-config-actions {
+    flex-direction: column-reverse;
+  }
+
+  .recovery-config-actions button,
+  .configure-recovery-button {
+    width: 100%;
+  }
+}
+
+.recovery-configuration {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.recovery-action-buttons {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.recovery-action-buttons button {
+  min-height: 42px;
+}
+
+@media (max-width: 600px) {
+  .recovery-action-buttons {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .recovery-action-buttons button {
+    width: 100%;
   }
 }

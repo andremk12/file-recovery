@@ -24,43 +24,60 @@
 - [x] Identificar disco do sistema
 - [x] Exibir espaço total e disponível
 - [x] Avisar sobre gravações no disco analisado
-- [] Impedir recuperação para o disco de origem
+- [x] Selecionar disco de destino
+- [x] Impedir recuperação para o disco de origem
 
 ## 3. Motor de varredura simulado
 
-- [ ] Criar contrato do motor de recuperação
-- [ ] Simular progresso
-- [ ] Implementar cancelamento
-- [ ] Gerar resultados fictícios
-- [ ] Validar o fluxo completo da interface
+- [x] Definir o contrato da varredura
+- [x] Validar os dados no processo principal
+- [x] Criar serviço de simulação
+- [x] Simular etapas e progresso
+- [x] Contabilizar arquivos encontrados
+- [x] Implementar cancelamento
+- [x] Criar canais IPC
+- [x] Expor funções pelo preload
+- [x] Testar pelo DevTools
+- [x] Integrar eventos ao React
+- [x] Criar modal de progresso
+- [x] Exibir percentual, tempo e quantidade
+- [x] Impedir alterações durante a execução
+- [x] Validar o cancelamento pelo modal
+- [x] Gerar arquivos fictícios encontrados
+- [x] Exibir resultados simulados
+- [x] Validar o fluxo completo
 
 ## 4. Motor de recuperação real
 
-- [ ] Avaliar Windows File Recovery
-- [ ] Avaliar leitura de metadados NTFS
-- [ ] Tratar permissões administrativas
-- [ ] Implementar varredura somente leitura
-- [ ] Tratar SSD, TRIM e arquivos sobrescritos
+- [ ] Definir o mecanismo real de recuperação
+- [ ] Verificar instalação e permissões
+- [ ] Montar o comando com segurança
+- [ ] Executar pelo processo principal
+- [ ] Capturar progresso e saída
+- [ ] Implementar cancelamento do processo real
+- [ ] Tratar erros e códigos de saída
 
 ## 5. Resultados e recuperação
 
 - [ ] Listar arquivos encontrados
-- [ ] Criar filtros e busca
-- [ ] Exibir possibilidade de recuperação
-- [ ] Selecionar destino
-- [ ] Recuperar para outro disco
+- [ ] Filtrar por nome, tipo e localização
+- [ ] Selecionar arquivos
+- [ ] Exibir tamanho e possibilidade de recuperação
+- [ ] Recuperar para o destino escolhido
+- [ ] Apresentar resumo da operação
 
 ## 6. Persistência
 
-- [ ] Armazenar sessões de varredura
-- [ ] Criar histórico
-- [ ] Persistir configurações
-- [ ] Registrar arquivos recuperados
+- [ ] Salvar varreduras realizadas
+- [ ] Registrar resultados e erros
+- [ ] Criar tela de histórico
+- [ ] Permitir consultar operações anteriores
+- [ ] Implementar limpeza do histórico
 
 ## 7. Distribuição
 
-- [ ] Configurar empacotamento
-- [ ] Criar instalador para Windows
-- [ ] Configurar ícones e metadados
-- [ ] Testar aplicação empacotada
-- [ ] Revisar segurança e permissões
+- [ ] Preparar o aplicativo para produção
+- [ ] Configurar ícone e informações
+- [ ] Gerar instalador do Windows
+- [ ] Testar em outro computador
+- [ ] Documentar instalação e utilização

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { HardDrive, RefreshCw, CheckCircle2, FolderOpen, AlertTriangle, XCircle, X, Search, FileText } from "lucide-react";
+import { HardDrive, RefreshCw, CheckCircle2, FolderOpen, AlertTriangle, XCircle, X, Search, FileText, Settings2} from "lucide-react";
 import "./Scan.css"
 
 const DRIVE_TYPE_LABELS = {
@@ -27,6 +27,64 @@ const RECOVERABILITY_LABELS = {
     medium: "Média",
     low: "Baixa"
 }
+
+
+const RECOVERY_FILE_GROUPS = {
+  all: {
+    label: "Todos os arquivos",
+    description:
+      "Procura todos os tipos suportados pelo Windows File Recovery.",
+    filters: [],
+  },
+
+  documents: {
+    label: "Documentos",
+    description:
+      "Word, PDF, Excel, PowerPoint e arquivos de texto.",
+    filters: [
+      "*.docx",
+      "*.pdf",
+      "*.xlsx",
+      "*.pptx",
+      "*.txt",
+    ],
+  },
+
+  images: {
+    label: "Imagens",
+    description:
+      "Fotos e imagens nos formatos mais comuns.",
+    filters: [
+      "*.jpg",
+      "*.jpeg",
+      "*.png",
+      "*.gif",
+    ],
+  },
+
+  videos: {
+    label: "Vídeos",
+    description:
+      "Arquivos MP4, MOV, AVI e MKV.",
+    filters: [
+      "*.mp4",
+      "*.mov",
+      "*.avi",
+      "*.mkv",
+    ],
+  },
+
+  archives: {
+    label: "Arquivos compactados",
+    description:
+      "Arquivos ZIP, RAR e 7Z.",
+    filters: [
+      "*.zip",
+      "*.rar",
+      "*.7z",
+    ],
+  },
+};
 
 function formatFileSize(bytes) {
     if (!Number.isFinite(bytes) || bytes < 0) {
@@ -119,6 +177,30 @@ function Scan() {
     const [showScanResults, setShowScanResults,] = useState(false)
 
 
+    const [recoveryMode, setRecoveryMode] = useState("regular");
+
+    const [recoveryCommandPreview, setRecoveryCommandPreview] = useState(null)
+    const [recoveryFileGroup, setRecoveryFileGroup] = useState("all")
+    const [recoveryCommandError, setRecoveryCommandError] = useState("")
+    const [isPreparingRecovery, setIsPreparingRecovery] = useState(false)
+
+    const [isRecoveryConfigModalOpen, setIsRecoveryConfigModalOpen] = useState(false)
+
+    function handleOpenRecoveryConfig() {
+  setRecoveryCommandError("");
+  setIsRecoveryConfigModalOpen(true);
+}
+
+function handleCloseRecoveryConfig() {
+  if (isPreparingRecovery) {
+    return;
+  }
+
+  setRecoveryCommandError("");
+  setIsRecoveryConfigModalOpen(false);
+}
+
+
     const [scanState, setScanState] = useState(
         () => ({...INITIAL_SCAN_STATE})
     )
@@ -160,7 +242,7 @@ function Scan() {
         if (!destinationDriveLetter) {
             setDestinationPath("")
             setDestinationError(
-                "Não foi possível identificar o disco da parte selecionada."
+                "Não foi possível identificar o disco da pasta selecionada."
             )
 
             return
@@ -203,7 +285,7 @@ function Scan() {
 
         const physicalDisksIdentified = Number.isInteger(sourceDiskNumber) && Number.isInteger(destinationDiskNumber)
 
-        if (physicalDisksIdentified && sourceDiskNumber == destinationDiskNumber) {
+        if (physicalDisksIdentified && sourceDiskNumber === destinationDiskNumber) {
             setDestinationPath("")
             setDestinationError(
                 `${sourceDriveLetter} e ${destinationDriveLetter}` + `pertence ao mesmo dísco físico ${sourceDiskNumber}.`
@@ -234,10 +316,78 @@ function Scan() {
     }
 }
 
+    async function handlePrepareRecovery() {
+        if (!selectedDrive) {
+            setRecoveryCommandError("Selecione o disco de origem")
+            return
+        }
+
+
+         if (!destinationPath) {
+        setRecoveryCommandError("Selecione uma pasta de destino")
+        return
+    }
+
+        if (!window.desktopAPI?.previewRecoveryCommand) {
+        setRecoveryCommandError ("A preparação da recuperação não esta disponível.")
+        return 
+    }
+
+     const selectedGroup = RECOVERY_FILE_GROUPS[recoveryFileGroup]
+
+     setIsPreparingRecovery(true)
+     setRecoveryCommandError("")
+     setRecoveryCommandPreview(null)
+
+     try {
+        const preview = await window.desktopAPI
+                        .previewRecoveryCommand(
+                            {
+                                sourceDrive: selectedDrive.letter,
+                                destinationPath,
+                                mode: recoveryMode,
+                                filters: selectedGroup.filters,
+                            })
+                            setRecoveryCommandPreview(preview)
+                            setIsRecoveryConfigModalOpen(false);
+            
+         } catch (preparationError) {
+            const message = preparationError instanceof Error
+                            ? preparationError.message
+                            : "Não foi possível preparar a recuperação."
+            setRecoveryCommandError(message)
+         } finally {
+            setIsPreparingRecovery(false)
+         }
+
+    }
+
+   
+
+
     const loadDrives = useCallback(async () => {
         setIsLoading(true);
-        setSelectedDriveId(false)
         setError("")
+        setSelectedDriveId(null);
+
+        setDestinationPath("");
+        setDestinationError("");
+        setDestinationWarning("");
+
+        setRecoveryCommandPreview(null);
+        setRecoveryCommandError("");
+        setRecoveryMode("regular");
+        setRecoveryFileGroup("all");
+        setIsRecoveryConfigModalOpen(false);
+
+        setScanState({
+            ...INITIAL_SCAN_STATE,
+        });
+
+        setScanError("");
+        setShowScanResults(false);
+        setIsScanModalOpen(false);
+
 
         try {
             if(!window.desktopAPI?.getDrive) {
@@ -352,8 +502,8 @@ function Scan() {
     ].includes(scanState.status)
 
     const canStartScan = Boolean(
-        selectedDrive && destinationPath &&
-        !destinationError && !isScanActive
+        selectedDrive && destinationPath && recoveryCommandPreview &&
+        !destinationError && !isScanActive && !isPreparingRecovery
     )
 
 
@@ -394,11 +544,14 @@ function Scan() {
   });
 
   try {
+    const selectedGroup = RECOVERY_FILE_GROUPS[recoveryFileGroup]
+    
     const startedScan =
       await window.desktopAPI.startScan({
         sourceDrive: selectedDrive.letter,
         destinationPath,
-        mode: "regular",
+        mode: recoveryMode,
+        filters: selectedGroup.filters
       });
 
     setScanState((currentState) => ({
@@ -509,6 +662,55 @@ useEffect(() => {
     );
   };
 }, [isScanModalOpen, isScanActive]);
+
+    useEffect(() => {
+    setRecoveryCommandPreview(null);
+    setRecoveryCommandError("");
+    }, [
+    selectedDriveId,
+    destinationPath,
+    recoveryMode,
+    recoveryFileGroup,
+    ]);
+
+    useEffect(() => {
+  if (!isRecoveryConfigModalOpen) {
+    return undefined;
+  }
+
+  const previousOverflow =
+    document.body.style.overflow;
+
+  document.body.style.overflow =
+    "hidden";
+
+  function handleKeyDown(event) {
+    if (
+      event.key === "Escape" &&
+      !isPreparingRecovery
+    ) {
+      setIsRecoveryConfigModalOpen(false);
+    }
+  }
+
+  window.addEventListener(
+    "keydown",
+    handleKeyDown,
+  );
+
+  return () => {
+    document.body.style.overflow =
+      previousOverflow;
+
+    window.removeEventListener(
+      "keydown",
+      handleKeyDown,
+    );
+  };
+}, [
+  isRecoveryConfigModalOpen,
+  isPreparingRecovery,
+]);
 
     return (
         <section className="page">
@@ -694,14 +896,16 @@ useEffect(() => {
                         <div className="source-write-warning" role="note">
                             <AlertTriangle size={21} aria-hidden="true"/>
                             <div>
+                                <strong>
                                 Evite utilizar o disco {selectedDrive.letter}
-                            </div>
+                                </strong>
+                      
 
                             <span>
                                 Criar, baixar ou instalar arquivos nesse disco pode
                                 sobrescrever dados que ainda poderiam ser recuperados.
                             </span>
-
+                        </div>
                         </div>
 
                       <button
@@ -722,23 +926,7 @@ useEffect(() => {
                                 : "Selecionar destino"}
                             </button>
 
-                            <div className="scan-actions">
-                            <button
-                                type="button"
-                                className="start-scan-button"
-                                onClick={handleStartScan}
-                                disabled={!canStartScan}
-                            >
-                                <Search size={18} aria-hidden="true" />
-
-                                {scanState.status === "idle"
-                                ? "Iniciar varredura"
-                                : "Executar novamente"}
-                            </button>
-                            </div>
-
-                    
-                        {destinationPath && (
+                    {destinationPath && (
                         <div
                             className="destination-success"
                             role="status"
@@ -767,26 +955,98 @@ useEffect(() => {
                                     />
 
                                     <span>{destinationWarning}</span>
-                                </div>
-                        )
+                                            </div>
+                                    )
 
-                        }
+                                    }
 
-                        {destinationError && (
-                        <div
-                            className="destination-error"
-                            role="alert"
-                        >
-                            <AlertTriangle
-                            size={20}
-                            aria-hidden="true"
-                            />
+                                    {destinationError && (
+                                    <div
+                                        className="destination-error"
+                                        role="alert"
+                                    >
+                                        <AlertTriangle
+                                        size={20}
+                                        aria-hidden="true"
+                                        />
 
-                            <span>{destinationError}</span>
-                        </div>
-                        )}
-                    </section>
-                    )}
+                                        <span>{destinationError}</span>
+                                    </div>
+                                    )}
+                                </section>
+                                )}
+
+                                {destinationPath && (
+                                        <div className="recovery-configuration">
+                                            {recoveryCommandPreview && (
+                                            <div
+                                                className="recovery-configuration-summary"
+                                                role="status"
+                                            >
+                                                <CheckCircle2
+                                                size={20}
+                                                aria-hidden="true"
+                                                />
+
+                                                <div>
+                                                <strong>
+                                                    Configuração validada
+                                                </strong>
+
+                                                <span>
+                                                    Modo:{" "}
+                                                    {recoveryMode === "regular"
+                                                    ? "Regular"
+                                                    : "Extensivo"}
+                                                    {" · "}
+                                                    {
+                                                    RECOVERY_FILE_GROUPS[
+                                                        recoveryFileGroup
+                                                    ].label
+                                                    }
+                                                </span>
+                                                </div>
+                                            </div>
+                                            )}
+
+                                            <div className="recovery-action-buttons">
+                                            <button
+                                                type="button"
+                                                className="configure-recovery-button"
+                                                onClick={
+                                                handleOpenRecoveryConfig
+                                                }
+                                                disabled={isScanActive}
+                                            >
+                                                <Settings2
+                                                size={18}
+                                                aria-hidden="true"
+                                                />
+
+                                                {recoveryCommandPreview
+                                                ? "Alterar configuração"
+                                                : "Configurar recuperação"}
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                className="start-scan-button"
+                                                onClick={handleStartScan}
+                                                disabled={!canStartScan}
+                                            >
+                                                <Search
+                                                size={18}
+                                                aria-hidden="true"
+                                                />
+
+                                                {scanState.status === "idle"
+                                                ? "Iniciar varredura"
+                                                : "Executar novamente"}
+                                            </button>
+                                            </div>
+                                        </div>
+                                        )}
+
 
          {isScanModalOpen && (
             <div
@@ -909,6 +1169,8 @@ useEffect(() => {
                 </div>
             </div>
          )}
+
+        
 
          {showScanResults && (
             <div className="scan-results">
@@ -1068,6 +1330,198 @@ useEffect(() => {
             </section>
         </div>
         )}
+
+         {isRecoveryConfigModalOpen && (
+                <div
+                    className="scan-modal-backdrop"
+                    onMouseDown={(event) => {
+                    if (
+                        event.target ===
+                        event.currentTarget &&
+                        !isPreparingRecovery
+                    ) {
+                        handleCloseRecoveryConfig();
+                    }
+                    }}
+                >
+                    <section
+                    className="recovery-config-modal"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="recovery-config-title"
+                    aria-describedby="recovery-config-description"
+                    >
+                    <header className="scan-modal-header">
+                        <div className="scan-modal-heading">
+                        <div className="scan-modal-icon">
+                            <Settings2
+                            size={24}
+                            aria-hidden="true"
+                            />
+                        </div>
+
+                        <div>
+                            <h2 id="recovery-config-title">
+                            Configurar recuperação
+                            </h2>
+
+                            <p id="recovery-config-description">
+                            Escolha o modo e os tipos
+                            de arquivo que deseja procurar.
+                            </p>
+                        </div>
+                        </div>
+
+                        <button
+                        type="button"
+                        className="scan-modal-close"
+                        onClick={
+                            handleCloseRecoveryConfig
+                        }
+                        disabled={isPreparingRecovery}
+                        aria-label="Fechar configurações"
+                        >
+                        <X size={20} />
+                        </button>
+                    </header>
+
+                    <div className="recovery-options">
+                        <fieldset className="mode-options">
+                        <legend>
+                            Modo de recuperação
+                        </legend>
+
+                        <label
+                            className={
+                            recoveryMode === "regular"
+                                ? "mode-option is-selected"
+                                : "mode-option"
+                            }
+                        >
+                            <input
+                            type="radio"
+                            name="recovery-mode"
+                            value="regular"
+                            checked={
+                                recoveryMode === "regular"
+                            }
+                            onChange={(event) =>
+                                setRecoveryMode(
+                                event.target.value,
+                                )
+                            }
+                            />
+
+                            <span>
+                            <strong>Regular</strong>
+
+                            <small>
+                                Para arquivos apagados
+                                recentemente em discos NTFS.
+                            </small>
+                            </span>
+                        </label>
+
+                        <label
+                            className={
+                            recoveryMode === "extensive"
+                                ? "mode-option is-selected"
+                                : "mode-option"
+                            }
+                        >
+                            <input
+                            type="radio"
+                            name="recovery-mode"
+                            value="extensive"
+                            checked={
+                                recoveryMode === "extensive"
+                            }
+                            onChange={(event) =>
+                                setRecoveryMode(
+                                event.target.value,
+                                )
+                            }
+                            />
+
+                            <span>
+                            <strong>Extensivo</strong>
+
+                            <small>
+                                Busca profunda para arquivos
+                                antigos ou discos formatados.
+                            </small>
+                            </span>
+                        </label>
+                        </fieldset>
+
+                        <label className="file-group-field">
+                        <span>Tipos de arquivo</span>
+
+                        <select
+                            value={recoveryFileGroup}
+                            onChange={(event) =>
+                            setRecoveryFileGroup(
+                                event.target.value,
+                            )
+                            }
+                        >
+                            {Object.entries(
+                            RECOVERY_FILE_GROUPS,
+                            ).map(([groupId, group]) => (
+                            <option
+                                key={groupId}
+                                value={groupId}
+                            >
+                                {group.label}
+                            </option>
+                            ))}
+                        </select>
+
+                        <small>
+                            {
+                            RECOVERY_FILE_GROUPS[
+                                recoveryFileGroup
+                            ].description
+                            }
+                        </small>
+                        </label>
+
+                        {recoveryCommandError && (
+                        <div
+                            className="recovery-command-error"
+                            role="alert"
+                        >
+                            {recoveryCommandError}
+                        </div>
+                        )}
+                    </div>
+
+                    <footer className="recovery-config-actions">
+                        <button
+                        type="button"
+                        className="modal-secondary-button"
+                        onClick={
+                            handleCloseRecoveryConfig
+                        }
+                        disabled={isPreparingRecovery}
+                        >
+                        Cancelar
+                        </button>
+
+                        <button
+                        type="button"
+                        className="prepare-recovery-button"
+                        onClick={handlePrepareRecovery}
+                        disabled={isPreparingRecovery}
+                        >
+                        {isPreparingRecovery
+                            ? "Validando..."
+                            : "Validar configuração"}
+                        </button>
+                    </footer>
+                    </section>
+                </div>
+                )}
 
         </section>
     )

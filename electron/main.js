@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { registerDriveIpc } from "./ipc/driveIpc.js"
 import { registerDestinationIpc } from "./ipc/destinationIpc.js";
 import { registerScanIpc } from "./ipc/scanIpc.js";
+import { registerRecoveryEngineIpc } from "./ipc/recoveryEngineIpc.js";
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -58,6 +59,7 @@ app.whenReady().then(() => {
   registerDriveIpc();
   registerDestinationIpc();
   registerScanIpc();
+  registerRecoveryEngineIpc()
 
   createWindow();
 

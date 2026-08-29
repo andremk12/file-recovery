@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer} = require("electron")
 
 
+
 contextBridge.exposeInMainWorld("desktopAPI", {
     getAppInfo: () => ipcRenderer.invoke("app:get-info"),
     getDrive: () => ipcRenderer.invoke("drives:list"),
@@ -8,6 +9,8 @@ contextBridge.exposeInMainWorld("desktopAPI", {
 
     startScan: (request) => ipcRenderer.invoke("scan:start", request),
     cancelScan: (scanId) => ipcRenderer.invoke("scan:cancel", scanId),
+    getRecoveryEngineStatus: () => ipcRenderer.invoke("recovery:engine-status"),
+    previewRecoveryCommand: (request) => ipcRenderer.invoke("recovery:preview-command", request),
 
     onScanUpdate: (callBack) => {
         if (typeof callBack !== "function") {
