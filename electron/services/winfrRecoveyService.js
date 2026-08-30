@@ -1,0 +1,512 @@
+import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import {
+  StringDecoder,
+} from "node:string_decoder";
+
+import {
+  getRecoveryEngineStatus,
+} from "./recoveryEngineService.js";
+
+import {
+  buildWinfrCommand,
+} from "./winfrCommandBuilder.js";
+
+let activeRecovery = null;
+
+function isProbablyUtf16(buffer) {
+  if (
+    buffer.length >= 2 &&
+    buffer[0] === 0xff &&
+    buffer[1] === 0xfe
+  ) {
+    return true;
+  }
+
+  let nullBytes = 0;
+
+  for (
+    let index = 1;
+    index < buffer.length;
+    index += 2
+  ) {
+    if (buffer[index] === 0) {
+      nullBytes += 1;
+    }
+  }
+
+  return nullBytes > buffer.length / 8;
+}
+
+function createProcessDecoder() {
+  let decoder = null;
+
+  function cleanOutput(value) {
+    return value
+      .replace(/^\uFEFF/, "")
+      .replace(/\u0000/g, "");
+  }
+
+  return {
+    write(chunk) {
+      if (!decoder) {
+        decoder = new StringDecoder(
+          isProbablyUtf16(chunk)
+            ? "utf16le"
+            : "utf8",
+        );
+      }
+
+      return cleanOutput(
+        decoder.write(chunk),
+      );
+    },
+
+    end() {
+      if (!decoder) {
+        return "";
+      }
+
+      return cleanOutput(
+        decoder.end(),
+      );
+    },
+  };
+}
+
+function extractLatestProgress(value) {
+  const matches = [
+    ...value.matchAll(
+      /(\d{1,3})%/g,
+    ),
+  ];
+
+  if (matches.length === 0) {
+    return null;
+  }
+
+  const progress = Number(
+    matches[matches.length - 1][1],
+  );
+
+  if (
+    !Number.isFinite(progress) ||
+    progress < 0 ||
+    progress > 100
+  ) {
+    return null;
+  }
+
+  return progress;
+}
+
+function cleanProgressOutput(value) {
+  return value
+    .replace(/\x08/g, "")
+    .replace(/\d{1,3}%/g, "")
+    .replace(/\r/g, "\n")
+    .trim();
+}
+
+function terminateWindowsProcess(pid) {
+  return new Promise((resolve) => {
+    const taskkill = spawn(
+      "taskkill.exe",
+      [
+        "/PID",
+        String(pid),
+        "/T",
+        "/F",
+      ],
+      {
+        shell: false,
+        windowsHide: true,
+        stdio: "ignore",
+      },
+    );
+
+    taskkill.once("error", () => {
+      resolve(false);
+    });
+
+    taskkill.once(
+      "close",
+      (exitCode) => {
+        resolve(exitCode === 0);
+      },
+    );
+  });
+}
+
+export async function startWinfrRecovery(
+  request,
+  onUpdate = () => {},
+) {
+  if (activeRecovery) {
+    throw new Error(
+      "Já existe uma recuperação em andamento.",
+    );
+  }
+
+  const engineStatus =
+    await getRecoveryEngineStatus();
+
+  if (
+    !engineStatus.available ||
+    !engineStatus.executablePath
+  ) {
+    throw new Error(
+      engineStatus.reason ||
+        "O Windows File Recovery não está disponível.",
+    );
+  }
+
+  const command =
+    buildWinfrCommand(request);
+
+  const recoveryId = randomUUID();
+  const startedAt = Date.now();
+
+  const childProcess = spawn(
+    engineStatus.executablePath,
+    command.args,
+    {
+      shell: false,
+      windowsHide: true,
+      stdio: [
+        "ignore",
+        "pipe",
+        "pipe",
+      ],
+    },
+  );
+
+  const stdoutDecoder =
+    createProcessDecoder();
+
+  const stderrDecoder =
+    createProcessDecoder();
+
+  let progressBuffer = "";
+  let lastProgress = -1;
+  let finalized = false;
+
+  const operation = {
+    recoveryId,
+    childProcess,
+    command,
+    startedAt,
+    cancelRequested: false,
+  };
+
+  activeRecovery = operation;
+
+  function emit(update) {
+    onUpdate({
+      recoveryId,
+      elapsedMs:
+        Date.now() - startedAt,
+      ...update,
+    });
+  }
+
+  function clearActiveRecovery() {
+    if (
+      activeRecovery?.recoveryId ===
+      recoveryId
+    ) {
+      activeRecovery = null;
+    }
+  }
+
+  childProcess.once("spawn", () => {
+    emit({
+      type: "started",
+      status: "running",
+      pid: childProcess.pid,
+      progress: 0,
+      message:
+        "Windows File Recovery iniciado.",
+      command:
+        command.displayCommand,
+    });
+  });
+
+  childProcess.stdout.on(
+    "data",
+    (chunk) => {
+      const decodedOutput =
+        stdoutDecoder.write(chunk);
+
+      progressBuffer = (
+        progressBuffer +
+        decodedOutput
+      ).slice(-128);
+
+      const progress =
+        extractLatestProgress(
+          progressBuffer,
+        );
+
+      if (
+        progress !== null &&
+        progress !== lastProgress
+      ) {
+        lastProgress = progress;
+
+        emit({
+          type: "progress",
+          status: "running",
+          progress,
+          message:
+            `Recuperando arquivos... ${progress}%`,
+        });
+      }
+
+      const readableOutput =
+        cleanProgressOutput(
+          decodedOutput,
+        );
+
+      if (readableOutput) {
+        emit({
+          type: "output",
+          status: "running",
+          stream: "stdout",
+          message: readableOutput,
+        });
+      }
+    },
+  );
+
+  childProcess.stderr.on(
+    "data",
+    (chunk) => {
+      const decodedOutput =
+        stderrDecoder.write(chunk);
+
+      const message =
+        cleanProgressOutput(
+          decodedOutput,
+        );
+
+      if (message) {
+        emit({
+          type: "output",
+          status: "running",
+          stream: "stderr",
+          message,
+        });
+      }
+    },
+  );
+
+  childProcess.once(
+    "error",
+    (processError) => {
+      if (finalized) {
+        return;
+      }
+
+      finalized = true;
+      clearActiveRecovery();
+
+      emit({
+        type: "failed",
+        status: "failed",
+        message:
+          `Não foi possível executar o WinFR: ${processError.message}`,
+      });
+    },
+  );
+
+  childProcess.once(
+    "close",
+    (exitCode, signal) => {
+      if (finalized) {
+        return;
+      }
+
+      finalized = true;
+
+      const remainingStdout =
+        cleanProgressOutput(
+          stdoutDecoder.end(),
+        );
+
+      const remainingStderr =
+        cleanProgressOutput(
+          stderrDecoder.end(),
+        );
+
+      if (remainingStdout) {
+        emit({
+          type: "output",
+          status: "running",
+          stream: "stdout",
+          message: remainingStdout,
+        });
+      }
+
+      if (remainingStderr) {
+        emit({
+          type: "output",
+          status: "running",
+          stream: "stderr",
+          message: remainingStderr,
+        });
+      }
+
+      clearActiveRecovery();
+
+      if (operation.cancelRequested) {
+        emit({
+          type: "cancelled",
+          status: "cancelled",
+          progress: lastProgress,
+          exitCode,
+          signal,
+          message:
+            "Recuperação cancelada.",
+        });
+
+        return;
+      }
+
+      if (exitCode === 0) {
+        emit({
+          type: "completed",
+          status: "completed",
+          progress: 100,
+          exitCode,
+          signal,
+          destinationFolder:
+            command.destinationFolder,
+          message:
+            "Recuperação concluída.",
+        });
+
+        return;
+      }
+
+      emit({
+        type: "failed",
+        status: "failed",
+        progress: lastProgress,
+        exitCode,
+        signal,
+        message:
+          `O WinFR foi encerrado com o código ${exitCode}.`,
+      });
+    },
+  );
+
+  return {
+    recoveryId,
+    pid: childProcess.pid,
+    status: "starting",
+    progress: 0,
+    sourceDrive:
+      command.sourceDrive,
+    destinationDrive:
+      command.destinationDrive,
+    destinationFolder:
+      command.destinationFolder,
+    mode: command.mode,
+    filters: command.filters,
+    command: command.displayCommand,
+  };
+}
+
+export function getActiveWinfrRecovery() {
+  if (!activeRecovery) {
+    return null;
+  }
+
+  return {
+    recoveryId:
+      activeRecovery.recoveryId,
+    pid:
+      activeRecovery.childProcess.pid,
+    status:
+      activeRecovery.cancelRequested
+        ? "cancelling"
+        : "running",
+    sourceDrive:
+      activeRecovery.command
+        .sourceDrive,
+    destinationFolder:
+      activeRecovery.command
+        .destinationFolder,
+    startedAt:
+      activeRecovery.startedAt,
+  };
+}
+
+export async function cancelWinfrRecovery(
+  recoveryId = null,
+) {
+  if (!activeRecovery) {
+    return {
+      cancelled: false,
+      message:
+        "Não existe uma recuperação ativa.",
+    };
+  }
+
+  const normalizedRecoveryId =
+    typeof recoveryId === "string"
+      ? recoveryId.trim()
+      : null;
+
+  if (
+    normalizedRecoveryId &&
+    normalizedRecoveryId !==
+      activeRecovery.recoveryId
+  ) {
+    return {
+      cancelled: false,
+      informedRecoveryId:
+        normalizedRecoveryId,
+      activeRecoveryId:
+        activeRecovery.recoveryId,
+      message:
+        "O ID informado pertence a outra recuperação.",
+    };
+  }
+
+  const operation = activeRecovery;
+
+  operation.cancelRequested = true;
+
+  let cancelled = false;
+
+  if (
+    process.platform === "win32" &&
+    operation.childProcess.pid
+  ) {
+    cancelled =
+      await terminateWindowsProcess(
+        operation.childProcess.pid,
+      );
+  } else {
+    cancelled =
+      operation.childProcess.kill(
+        "SIGTERM",
+      );
+  }
+
+  return {
+    cancelled,
+    recoveryId:
+      operation.recoveryId,
+    pid:
+      operation.childProcess.pid,
+    status: cancelled
+      ? "cancelling"
+      : "running",
+    message: cancelled
+      ? "Cancelamento solicitado."
+      : "Não foi possível cancelar.",
+  };
+}

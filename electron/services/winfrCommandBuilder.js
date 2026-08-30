@@ -124,7 +124,7 @@ export function buildWinfrCommand(request) {
 
   const args = [
     sourceDrive,
-    destinationDrive,
+    destinationPath,
     `/${mode}`,
     "/a",
   ];
@@ -138,8 +138,8 @@ export function buildWinfrCommand(request) {
     args,
     sourceDrive,
     destinationDrive,
-    requestedDestinationPath:
-      destinationPath,
+    requestedDestinationPath:destinationPath,
+    destinationFolder: destinationPath,
     mode,
     filters,
 

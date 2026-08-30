@@ -1,7 +1,5 @@
 const { contextBridge, ipcRenderer} = require("electron")
 
-
-
 contextBridge.exposeInMainWorld("desktopAPI", {
     getAppInfo: () => ipcRenderer.invoke("app:get-info"),
     getDrive: () => ipcRenderer.invoke("drives:list"),
@@ -11,6 +9,23 @@ contextBridge.exposeInMainWorld("desktopAPI", {
     cancelScan: (scanId) => ipcRenderer.invoke("scan:cancel", scanId),
     getRecoveryEngineStatus: () => ipcRenderer.invoke("recovery:engine-status"),
     previewRecoveryCommand: (request) => ipcRenderer.invoke("recovery:preview-command", request),
+    testRecoveryEngine: () => ipcRenderer.invoke("recovery:test-engine"),
+    startRealRecovery: (request) => ipcRenderer.invoke("recovery:start-real", request),
+    cancelRealRecovery: (recoveryId) => ipcRenderer.invoke("recovery:cancel-real", recoveryId),
+    getActiveRealRecovery: () => ipcRenderer.invoke("recovery:get-active-real"),
+    onRealRecoveryUpdate: (callBack) => {
+        const listener = (_event, update) => {
+            callBack(update)
+        }
+
+        ipcRenderer.on("recovery:real-update", listener)
+
+        return () => {
+            ipcRenderer.removeListener(
+                "recovery:real-update", listener
+            )
+        }
+    },
 
     onScanUpdate: (callBack) => {
         if (typeof callBack !== "function") {

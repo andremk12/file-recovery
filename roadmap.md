@@ -49,13 +49,23 @@
 
 ## 4. Motor de recuperação real
 
-- [ ] Definir o mecanismo real de recuperação
-- [ ] Verificar instalação e permissões
-- [ ] Montar o comando com segurança
-- [ ] Executar pelo processo principal
-- [ ] Capturar progresso e saída
-- [ ] Implementar cancelamento do processo real
-- [ ] Tratar erros e códigos de saída
+- [x] Detectar a instalação do WinFR
+- [x] Validar execução com privilégios administrativos
+- [x] Criar gerador seguro de argumentos
+- [x] Configurar modo Regular e Extensivo
+- [x] Configurar filtros por categoria
+- [x] Criar modal de configuração
+- [x] Executar o WinFR com spawn
+- [x] Corrigir a saída UTF-16LE
+- [x] Capturar eventos de progresso
+- [x] Consultar a recuperação ativa
+- [x] Cancelar a recuperação pelo aplicativo
+- [ ] Executar uma recuperação completa
+- [ ] Confirmar o arquivo recuperado no destino
+- [ ] Conectar a execução real ao modal de progresso
+- [ ] Substituir a varredura simulada
+- [ ] Exibir os resultados reais recuperados
+- [ ] Implementar elevação UAC na versão instalada
 
 ## 5. Resultados e recuperação
 
