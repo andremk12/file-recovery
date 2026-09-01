@@ -88,8 +88,8 @@ function normalizeDrive(drive) {
         totalBytes: parseNullableNumber(drive.Size),
         freeBytes: parseNullableNumber(drive.FreeSpace),
         isSystem: driveLetter === systemDrive,
-        diskNumber: parseNullableNumber(drive.diskNumber),
-        partitionNumber: parseNullableNumber(drive.partitionNumber,)
+        diskNumber: parseNullableNumber(drive.DiskNumber),
+        partitionNumber: parseNullableNumber(drive.PartitionNumber,)
     }
 }
 

@@ -173,11 +173,23 @@ export async function startWinfrRecovery(
   const recoveryId = randomUUID();
   const startedAt = Date.now();
 
-  const recoveryFoldersBefore = 
-    await snapshotRecoveryFolders({
-      destinationPath:command.destinationFolder,
-      destinationDrive: command.destinationDrive
-    })
+let recoveryFoldersBefore = [];
+
+  try {
+    recoveryFoldersBefore =
+      await snapshotRecoveryFolders({
+        destinationPath:
+          command.destinationFolder,
+
+        destinationDrive:
+          command.destinationDrive,
+      });
+  } catch (error) {
+    console.warn(
+      "Não foi possível criar o snapshot das pastas de recuperação:",
+      error,
+    );
+  }
 
   const childProcess = spawn(
     engineStatus.executablePath,
@@ -371,9 +383,9 @@ export async function startWinfrRecovery(
         });
       }
 
-      clearActiveRecovery();
-
       if (operation.cancelRequested) {
+        clearActiveRecovery();
+
         emit({
           type: "cancelled",
           status: "cancelled",
@@ -387,7 +399,31 @@ export async function startWinfrRecovery(
         return;
       }
 
-    if (exitCode === 0) {
+      if (exitCode !== 0) {
+        clearActiveRecovery();
+
+        emit({
+          type: "failed",
+          status: "failed",
+          progress: lastProgress,
+          exitCode,
+          signal,
+          message:
+            `O WinFR foi encerrado com o código ${exitCode}.`,
+        });
+
+        return;
+      }
+
+      try {
+        emit({
+          type: "finalizing",
+          status: "running",
+          progress: 100,
+          message:
+            "Organizando os arquivos recuperados...",
+        });
+
         const recoveredResults =
           await collectRecoveredResults({
             destinationPath:
@@ -402,6 +438,8 @@ export async function startWinfrRecovery(
             startedAt:
               operation.startedAt,
           });
+
+        clearActiveRecovery();
 
         emit({
           type: "completed",
@@ -428,19 +466,21 @@ export async function startWinfrRecovery(
           message:
             `${recoveredResults.filesFound} arquivo(s) recuperado(s).`,
         });
+      } catch (resultError) {
+        clearActiveRecovery();
 
-        return;
+        emit({
+          type: "failed",
+          status: "failed",
+          progress: 100,
+          exitCode,
+          signal,
+          message:
+            resultError instanceof Error
+              ? `A recuperação terminou, mas não foi possível processar os resultados: ${resultError.message}`
+              : "A recuperação terminou, mas não foi possível processar os resultados.",
+        });
       }
-
-      emit({
-        type: "failed",
-        status: "failed",
-        progress: lastProgress,
-        exitCode,
-        signal,
-        message:
-          `O WinFR foi encerrado com o código ${exitCode}.`,
-      });
     },
   );
 
@@ -520,7 +560,6 @@ export async function cancelWinfrRecovery(
 
   const operation = activeRecovery;
 
-  operation.cancelRequested = true;
 
   let cancelled = false;
 
@@ -537,6 +576,10 @@ export async function cancelWinfrRecovery(
       operation.childProcess.kill(
         "SIGTERM",
       );
+
+    if (cancelled) {
+      operation.cancelRequested = true;
+    }
   }
 
   return {
