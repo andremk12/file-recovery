@@ -12,6 +12,12 @@ import {
   buildWinfrCommand,
 } from "./winfrCommandBuilder.js";
 
+
+import { 
+    collectRecoveredResults, 
+    snapshotRecoveryFolders 
+  } from "./recoveryResultService.js";
+
 let activeRecovery = null;
 
 function isProbablyUtf16(buffer) {
@@ -167,6 +173,12 @@ export async function startWinfrRecovery(
   const recoveryId = randomUUID();
   const startedAt = Date.now();
 
+  const recoveryFoldersBefore = 
+    await snapshotRecoveryFolders({
+      destinationPath:command.destinationFolder,
+      destinationDrive: command.destinationDrive
+    })
+
   const childProcess = spawn(
     engineStatus.executablePath,
     command.args,
@@ -188,7 +200,7 @@ export async function startWinfrRecovery(
     createProcessDecoder();
 
   let progressBuffer = "";
-  let lastProgress = -1;
+  let lastProgress = 0;
   let finalized = false;
 
   const operation = {
@@ -197,6 +209,8 @@ export async function startWinfrRecovery(
     command,
     startedAt,
     cancelRequested: false,
+
+    recoveryFoldersBefore,
   };
 
   activeRecovery = operation;
@@ -322,7 +336,7 @@ export async function startWinfrRecovery(
 
   childProcess.once(
     "close",
-    (exitCode, signal) => {
+    async (exitCode, signal) => {
       if (finalized) {
         return;
       }
@@ -373,17 +387,46 @@ export async function startWinfrRecovery(
         return;
       }
 
-      if (exitCode === 0) {
+    if (exitCode === 0) {
+        const recoveredResults =
+          await collectRecoveredResults({
+            destinationPath:
+              command.destinationFolder,
+
+            destinationDrive:
+              command.destinationDrive,
+
+            previousFolders:
+              operation.recoveryFoldersBefore,
+
+            startedAt:
+              operation.startedAt,
+          });
+
         emit({
           type: "completed",
           status: "completed",
           progress: 100,
           exitCode,
           signal,
+
           destinationFolder:
             command.destinationFolder,
+
+          filesFound:
+            recoveredResults.filesFound,
+
+          results:
+            recoveredResults.results,
+
+          resultsTruncated:
+            recoveredResults.resultsTruncated,
+
+          recoveryFolders:
+            recoveredResults.recoveryFolders,
+
           message:
-            "Recuperação concluída.",
+            `${recoveredResults.filesFound} arquivo(s) recuperado(s).`,
         });
 
         return;

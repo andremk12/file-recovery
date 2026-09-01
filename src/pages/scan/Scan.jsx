@@ -23,9 +23,10 @@ const INITIAL_SCAN_STATE = {
 }
 
 const RECOVERABILITY_LABELS = {
-    high: "Alta",
-    medium: "Média",
-    low: "Baixa"
+  high: "Alta",
+  medium: "Média",
+  low: "Baixa",
+  recovered: "Recuperado",
 }
 
 
@@ -84,6 +85,16 @@ const RECOVERY_FILE_GROUPS = {
       "*.7z",
     ],
   },
+
+  quickTest: {
+  label: "Teste rápido (.txt)",
+  description:
+    "Procura apenas arquivos TXT. Ideal para testes durante o desenvolvimento.",
+  filters: [
+    "*.txt",
+  ],
+},
+
 };
 
 function formatFileSize(bytes) {
@@ -156,8 +167,104 @@ function calculateUsedPercentage(drive) {
     return Math.min(Math.max(percentage, 0), 100)
 }
 
+function buildRecoveryFilters(
+  fileGroup,
+  sourceFolder,
+) {
+  const group =
+    RECOVERY_FILE_GROUPS[fileGroup];
+
+  if (!group) {
+    return [];
+  }
+
+  const rawFolder =
+    typeof sourceFolder === "string"
+      ? sourceFolder.trim()
+      : "";
+
+  if (!rawFolder) {
+    return group.filters;
+  }
+
+  let folder =
+    rawFolder.replace(/\//g, "\\");
+
+  if (!folder.startsWith("\\")) {
+    folder = `\\${folder}`;
+  }
+
+  if (!folder.endsWith("\\")) {
+    folder += "\\";
+  }
+
+  if (group.filters.length === 0) {
+    return [folder];
+  }
+
+  return group.filters.map(
+    (filter) =>
+      `${folder}${filter}`,
+  );
+}
+
+function getRecoveryDisplayMessage(
+  message,
+  status,
+) {
+  if (status === "starting") {
+    return "Preparando a recuperação...";
+  }
+
+  if (!message) {
+    return "Aguardando informações do Windows File Recovery...";
+  }
+
+  const normalized =
+    message.toLowerCase();
+
+  if (
+    normalized.includes("pass 1") &&
+    normalized.includes("scanning")
+  ) {
+    return "Analisando e processando o disco...";
+  }
+
+  if (
+    normalized.includes("pass 2") ||
+    normalized.includes("recovering files")
+  ) {
+    return "Recuperando os arquivos encontrados...";
+  }
+
+  if (
+    normalized.includes(
+      "no recoverable files",
+    )
+  ) {
+    return "Nenhum arquivo recuperável foi encontrado com esta configuração.";
+  }
+
+  if (
+    normalized.includes(
+      "windows file recovery iniciado",
+    )
+  ) {
+    return "Windows File Recovery iniciado...";
+  }
+
+  return message;
+}
 
 
+function getAutomaticRecoveryMode(drive) {
+  const fileSystem =
+    drive?.fileSystem?.toUpperCase();
+
+  return fileSystem === "NTFS"
+    ? "regular"
+    : "extensive";
+}
 
 function Scan() {
 
@@ -185,6 +292,12 @@ function Scan() {
     const [isPreparingRecovery, setIsPreparingRecovery] = useState(false)
 
     const [isRecoveryConfigModalOpen, setIsRecoveryConfigModalOpen] = useState(false)
+
+    const [recoverySourceFolder, setRecoverySourceFolder] = useState("")
+
+    const [recoveryStartedAt,setRecoveryStartedAt] = useState(null);
+
+    const [ liveElapsedMs, setLiveElapsedMs] = useState(0);
 
     function handleOpenRecoveryConfig() {
   setRecoveryCommandError("");
@@ -333,7 +446,11 @@ function handleCloseRecoveryConfig() {
         return 
     }
 
-     const selectedGroup = RECOVERY_FILE_GROUPS[recoveryFileGroup]
+     const filters =
+        buildRecoveryFilters(
+            recoveryFileGroup,
+            recoverySourceFolder,
+  );
 
      setIsPreparingRecovery(true)
      setRecoveryCommandError("")
@@ -346,7 +463,7 @@ function handleCloseRecoveryConfig() {
                                 sourceDrive: selectedDrive.letter,
                                 destinationPath,
                                 mode: recoveryMode,
-                                filters: selectedGroup.filters,
+                                filters,
                             })
                             setRecoveryCommandPreview(preview)
                             setIsRecoveryConfigModalOpen(false);
@@ -361,8 +478,6 @@ function handleCloseRecoveryConfig() {
          }
 
     }
-
-   
 
 
     const loadDrives = useCallback(async () => {
@@ -425,71 +540,79 @@ function handleCloseRecoveryConfig() {
         loadDrives()
     }, [loadDrives])
 
-    useEffect(() => {
-            if (!window.desktopAPI?.onScanUpdate) {
-                return undefined;
-            }
 
-            const removeListener =
-                window.desktopAPI.onScanUpdate((update) => {
-                setScanState((currentState) => {
-                    if (
-                    currentState.scanId &&
-                    update.scanId !== currentState.scanId
-                    ) {
-                    return currentState;
-                    }
+   useEffect(() => {
+  if (!window.desktopAPI?.onRealRecoveryUpdate) {
+    return undefined;
+  }
 
-                    let message = update.message;
+  const removeListener =
+    window.desktopAPI.onRealRecoveryUpdate((update) => {
 
-                    if (
-                    update.type === "completed" &&
-                    !message
-                    ) {
-                    message = "Varredura concluída.";
-                    }
+        
+      setScanState((currentState) => {
+        if (
+          currentState.scanId &&
+          update.recoveryId !== currentState.scanId
+        ) {
+          return currentState;
+        }
 
-                    if (
-                    update.type === "cancelled" &&
-                    !message
-                    ) {
-                    message = "Varredura cancelada.";
-                    }
+        return {
+          ...currentState,
 
-                    return {
-                    ...currentState,
-                    scanId: update.scanId,
-                    status: update.status,
-                    progress:
-                        update.progress ??
-                        currentState.progress,
-                    phase:
-                        update.phase ??
-                        currentState.phase,
-                    message:
-                        message ??
-                        currentState.message,
-                    filesFound:
-                        update.filesFound ??
-                        currentState.filesFound,
-                    elapsedMs:
-                        update.elapsedMs ??
-                        update.durationMs ??
-                        currentState.elapsedMs,
-                    results: Array.isArray(update.results) ? update.results : currentState.results
-                    };
-                });
+          scanId:
+            update.recoveryId ??
+            currentState.scanId,
 
-                if (update.type === "failed") {
-                    setScanError(
-                    update.message ||
-                        "A varredura falhou.",
-                    );
-                }
-                });
+          status:
+            update.status ??
+            currentState.status,
 
-            return removeListener;
-            }, []);
+          progress:
+            update.progress ??
+            currentState.progress,
+
+          message:
+            update.message ??
+            currentState.message,
+
+          elapsedMs:
+            update.elapsedMs ??
+            currentState.elapsedMs,
+
+          filesFound:
+            update.filesFound ??
+            currentState.filesFound,
+
+          results:
+            Array.isArray(update.results)
+              ? update.results
+              : currentState.results,
+        };
+      });
+
+      if (
+  Number.isFinite(update.elapsedMs)
+) {
+  setLiveElapsedMs(
+    update.elapsedMs,
+  );
+}
+      if (update.type === "completed") {
+        setShowScanResults(true);
+      }
+
+      if (update.type === "failed") {
+        setScanError(
+          update.message ||
+          "A recuperação falhou.",
+        );
+      }
+    });
+
+  return removeListener;
+}, []);
 
     const selectedDrive = drives.find(
         (drive) => drive.id === selectedDriveId,
@@ -501,72 +624,144 @@ function handleCloseRecoveryConfig() {
         "cancelling"
     ].includes(scanState.status)
 
+    const isProgressIndeterminate =
+        isScanActive &&
+        scanState.progress <= 0;
+
+        const recoveryDisplayMessage =
+        getRecoveryDisplayMessage(
+            scanState.message,
+            scanState.status,
+        );
+
+    useEffect(() => {
+  if (
+    !isScanActive ||
+    !recoveryStartedAt
+  ) {
+    return undefined;
+  }
+
+  function updateElapsedTime() {
+    setLiveElapsedMs(
+      Date.now() - recoveryStartedAt,
+    );
+  }
+
+  updateElapsedTime();
+
+  const intervalId =
+    setInterval(
+      updateElapsedTime,
+      1000,
+    );
+
+  return () => {
+    clearInterval(intervalId);
+  };
+}, [
+  isScanActive,
+  recoveryStartedAt,
+]);
+
     const canStartScan = Boolean(
         selectedDrive && destinationPath && recoveryCommandPreview &&
         !destinationError && !isScanActive && !isPreparingRecovery
     )
 
 
-    function handleSelectDrive(driveId) {
-        if (driveId !== selectedDriveId) {
-            setDestinationPath("")
-            setDestinationError("")
-            setDestinationWarning("")
-        }
+function handleSelectDrive(driveId) {
+  const drive = drives.find(
+    (item) => item.id === driveId
+  );
 
-        setSelectedDriveId(driveId)
-    }
+  if (driveId !== selectedDriveId) {
+    setDestinationPath("");
+    setDestinationError("");
+    setDestinationWarning("");
 
-    async function handleStartScan() {
+    setRecoveryCommandPreview(null);
+    setRecoveryCommandError("");
+  }
+
+  setSelectedDriveId(driveId);
+
+  if (!drive) {
+    return;
+  }
+
+  setRecoveryMode(
+    getAutomaticRecoveryMode(drive)
+  );
+}
+
+async function handleStartScan() {
   if (!canStartScan) {
     setScanError(
-      "Selecione a origem e a pasta de destino.",
+      "Selecione a origem, o destino e configure a recuperação.",
     );
 
     return;
   }
 
-  if (!window.desktopAPI?.startScan) {
+  if (!window.desktopAPI?.startRealRecovery) {
     setScanError(
-      "A varredura não está disponível.",
+      "A recuperação real não está disponível.",
     );
 
     return;
   }
-  setShowScanResults(false)
-  setIsScanModalOpen(true)
+
+  const startedAt = Date.now();
+
+  setRecoveryStartedAt(startedAt);
+  setLiveElapsedMs(0);
+
+  setShowScanResults(false);
+  setIsScanModalOpen(true);
   setScanError("");
 
   setScanState({
     ...INITIAL_SCAN_STATE,
     status: "starting",
-    message: "Iniciando a varredura...",
+    message: "Iniciando a recuperação...",
   });
 
   try {
-    const selectedGroup = RECOVERY_FILE_GROUPS[recoveryFileGroup]
-    
-    const startedScan =
-      await window.desktopAPI.startScan({
+    const filters =
+      buildRecoveryFilters(
+        recoveryFileGroup,
+        recoverySourceFolder,
+      );
+
+    const startedRecovery =
+      await window.desktopAPI.startRealRecovery({
         sourceDrive: selectedDrive.letter,
         destinationPath,
         mode: recoveryMode,
-        filters: selectedGroup.filters
+        filters,
       });
 
     setScanState((currentState) => ({
       ...currentState,
-      scanId: startedScan.scanId,
-      status: startedScan.status,
-      progress: startedScan.progress ?? 0,
-      filesFound:
-        startedScan.filesFound ?? 0,
+
+      scanId: startedRecovery.recoveryId,
+
+      status:
+        startedRecovery.status ??
+        "starting",
+
+      progress:
+        startedRecovery.progress ?? 0,
+
+      message:
+        "Windows File Recovery iniciado.",
     }));
   } catch (startError) {
     const message =
       startError instanceof Error
         ? startError.message
-        : "Não foi possível iniciar a varredura.";
+        : "Não foi possível iniciar a recuperação.";
 
     setScanState({
       ...INITIAL_SCAN_STATE,
@@ -581,7 +776,7 @@ function handleCloseRecoveryConfig() {
 async function handleCancelScan() {
   if (
     !scanState.scanId ||
-    !window.desktopAPI?.cancelScan
+    !window.desktopAPI?.cancelRealRecovery
   ) {
     return;
   }
@@ -591,19 +786,24 @@ async function handleCancelScan() {
   setScanState((currentState) => ({
     ...currentState,
     status: "cancelling",
-    message: "Cancelando a varredura...",
+    message: "Cancelando a recuperação...",
   }));
 
   try {
     const result =
-      await window.desktopAPI.cancelScan(
+      await window.desktopAPI.cancelRealRecovery(
         scanState.scanId,
       );
 
     if (!result.cancelled) {
+      setScanState((currentState) => ({
+        ...currentState,
+        status: "running",
+      }));
+
       setScanError(
         result.message ||
-          "Não foi possível cancelar.",
+          "Não foi possível cancelar a recuperação.",
       );
     }
   } catch (cancelError) {
@@ -615,7 +815,7 @@ async function handleCancelScan() {
     setScanError(
       cancelError instanceof Error
         ? cancelError.message
-        : "Não foi possível cancelar.",
+        : "Não foi possível cancelar a recuperação.",
     );
   }
 }
@@ -667,10 +867,11 @@ useEffect(() => {
     setRecoveryCommandPreview(null);
     setRecoveryCommandError("");
     }, [
-    selectedDriveId,
-    destinationPath,
-    recoveryMode,
-    recoveryFileGroup,
+        selectedDriveId,
+        destinationPath,
+        recoveryMode,
+        recoveryFileGroup,
+        recoverySourceFolder,
     ]);
 
     useEffect(() => {
@@ -1102,12 +1303,11 @@ useEffect(() => {
 
                 <div>
                     <h2 id="scan-modal-title">
-                    Varredura de arquivos
+                         Recuperação de arquivos
                     </h2>
 
-                    <p id="scan-modal-description">
-                    {scanState.message ||
-                        "Preparando a varredura..."}
+                   <p id="scan-modal-description">
+                        {recoveryDisplayMessage}
                     </p>
                 </div>
                 </div>
@@ -1130,29 +1330,53 @@ useEffect(() => {
             >
                 <div className="scan-progress-information">
                 <span>Progresso</span>
-                <strong>
-                    {scanState.progress}%
+              <strong>
+                {isProgressIndeterminate
+                    ? "Analisando..."
+                    : `${scanState.progress}%`}
                 </strong>
                 </div>
 
-                <div
-                className="scan-progress-track"
-                role="progressbar"
-                aria-valuemin="0"
-                aria-valuemax="100"
-                aria-valuenow={scanState.progress}
-                >
-                <div
-                    className="scan-progress-value"
-                    style={{
-                    width: `${scanState.progress}%`,
-                    }}
-                />
-                </div>
+              <div
+                    className={`scan-progress-track ${
+                        isProgressIndeterminate
+                        ? "is-indeterminate"
+                        : ""
+                    }`}
+                    role="progressbar"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                    aria-valuenow={
+                        isProgressIndeterminate
+                        ? undefined
+                        : scanState.progress
+                    }
+                    aria-valuetext={
+                        isProgressIndeterminate
+                        ? "Analisando o disco"
+                        : undefined
+                    }
+                    >
+                    <div
+                        className={`scan-progress-value ${
+                        isProgressIndeterminate
+                            ? "is-indeterminate"
+                            : ""
+                        }`}
+                        style={
+                        isProgressIndeterminate
+                            ? undefined
+                            : {
+                                width:
+                                `${scanState.progress}%`,
+                            }
+                        }
+                    />
+                    </div>
 
                 <div className="scan-modal-metrics">
                 <div>
-                    <span>Arquivos encontrados</span>
+                    <span>Arquivos Recuperados</span>
                     <strong>
                     {scanState.filesFound}
                     </strong>
@@ -1162,11 +1386,54 @@ useEffect(() => {
                     <span>Tempo decorrido</span>
                     <strong>
                     {formatElapsedTime(
-                        scanState.elapsedMs,
+                        liveElapsedMs,
                     )}
                     </strong>
                 </div>
                 </div>
+
+
+                <div className="scan-recovery-context">
+                    <div>
+                        <span>Origem</span>
+
+                        <strong>
+                        {selectedDrive?.letter || "-"}
+                        </strong>
+                    </div>
+
+                    <div>
+                        <span>Destino</span>
+
+                        <strong>
+                        {extractDriveLetter(
+                            destinationPath,
+                        ) || "-"}
+                        </strong>
+                    </div>
+
+                    <div>
+                        <span>Modo</span>
+
+                        <strong>
+                        {recoveryMode === "regular"
+                            ? "Regular"
+                            : "Extensivo"}
+                        </strong>
+                    </div>
+
+                    <div>
+                        <span>Filtro</span>
+
+                        <strong>
+                        {
+                            RECOVERY_FILE_GROUPS[
+                            recoveryFileGroup
+                            ]?.label
+                        }
+                        </strong>
+                    </div>
+                    </div>
             </div>
          )}
 
@@ -1176,11 +1443,11 @@ useEffect(() => {
             <div className="scan-results">
                 <div className="scan-results-header">
                     <div>
-                        <h3>Arquivos encontrados</h3>
-                         <p>
-                            Resultados gerados pela varredura
-                            simulada.
-                         </p>
+                       <h3>Arquivos recuperados</h3>
+                            <p>
+                            Arquivos recuperados pelo
+                            Windows File Recovery.
+                            </p>
                     </div>
 
                     <span className="results-count">
@@ -1205,8 +1472,8 @@ useEffect(() => {
                             <div className="scan-result-information">
                                 <strong>{file.name}</strong>
 
-                                <span title={file.originalPath}>
-                                    {file.originalPath}
+                                <span title={file.recoveredPath}>
+                                    {file.recoveredPath}
                                 </span>
                             </div>
 
@@ -1391,67 +1658,56 @@ useEffect(() => {
                             Modo de recuperação
                         </legend>
 
-                        <label
-                            className={
+                    <label
+                        className={
                             recoveryMode === "regular"
-                                ? "mode-option is-selected"
-                                : "mode-option"
-                            }
+                            ? "mode-option is-selected"
+                            : "mode-option"
+                        }
                         >
-                            <input
+                        <input
                             type="radio"
                             name="recovery-mode"
                             value="regular"
-                            checked={
-                                recoveryMode === "regular"
-                            }
-                            onChange={(event) =>
-                                setRecoveryMode(
-                                event.target.value,
-                                )
-                            }
-                            />
+                            checked={recoveryMode === "regular"}
+                            disabled
+                            readOnly
+                        />
 
-                            <span>
+                        <span>
                             <strong>Regular</strong>
 
                             <small>
-                                Para arquivos apagados
-                                recentemente em discos NTFS.
+                            Usado automaticamente para discos NTFS.
                             </small>
-                            </span>
-                        </label>
+                        </span>
+                                        </label>
 
-                        <label
-                            className={
-                            recoveryMode === "extensive"
-                                ? "mode-option is-selected"
-                                : "mode-option"
-                            }
-                        >
-                            <input
-                            type="radio"
-                            name="recovery-mode"
-                            value="extensive"
-                            checked={
-                                recoveryMode === "extensive"
-                            }
-                            onChange={(event) =>
-                                setRecoveryMode(
-                                event.target.value,
-                                )
-                            }
-                            />
+                                        <label
+                    className={
+                        recoveryMode === "extensive"
+                        ? "mode-option is-selected"
+                        : "mode-option"
+                    }
+                    >
+                    <input
+                        type="radio"
+                        name="recovery-mode"
+                        value="extensive"
+                        checked={recoveryMode === "extensive"}
+                        disabled
+                        readOnly
+                    />
 
-                            <span>
-                            <strong>Extensivo</strong>
+                    <span>
+                        <strong>Extensivo</strong>
 
-                            <small>
-                                Busca profunda para arquivos
-                                antigos ou discos formatados.
-                            </small>
-                            </span>
-                        </label>
+                        <small>
+                        Usado automaticamente para FAT32, exFAT
+                        e outros sistemas de arquivos.
+                        </small>
+                    </span>
+                    </label>
                         </fieldset>
 
                         <label className="file-group-field">
@@ -1484,6 +1740,26 @@ useEffect(() => {
                             ].description
                             }
                         </small>
+                        </label>
+
+                        <label className="file-group-field">
+                                <span>Pasta de origem</span>
+
+                                <input
+                                    type="text"
+                                    value={recoverySourceFolder}
+                                    onChange={(event) =>
+                                    setRecoverySourceFolder(
+                                        event.target.value,
+                                    )
+                                    }
+                                    placeholder="\RecoveryTest\"
+                                />
+
+                                <small>
+                                    Opcional. Deixe vazio para analisar
+                                    todo o disco.
+                                </small>
                         </label>
 
                         {recoveryCommandError && (

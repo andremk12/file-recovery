@@ -60,11 +60,11 @@
 - [x] Capturar eventos de progresso
 - [x] Consultar a recuperação ativa
 - [x] Cancelar a recuperação pelo aplicativo
-- [ ] Executar uma recuperação completa
-- [ ] Confirmar o arquivo recuperado no destino
-- [ ] Conectar a execução real ao modal de progresso
-- [ ] Substituir a varredura simulada
-- [ ] Exibir os resultados reais recuperados
+- [x] Executar uma recuperação completa
+- [x] Confirmar o arquivo recuperado no destino
+- [x] Conectar a execução real ao modal de progresso
+- [x] Substituir a varredura simulada
+- [x] Exibir os resultados reais recuperados
 - [ ] Implementar elevação UAC na versão instalada
 
 ## 5. Resultados e recuperação
