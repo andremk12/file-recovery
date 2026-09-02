@@ -441,6 +441,8 @@ try {
 
       startedAt:
         operation.startedAt,
+
+      resultFilters: command.resultFilters,
     });
 
   /*
@@ -473,6 +475,9 @@ try {
     recoveryFolders:
       recoveredResults.recoveryFolders,
 
+    filesRecoveryByEngine: recoveredResults.filesRecoveryByEngine,
+    filesFilteredOut: recoveredResults.filesFilteredOut,
+
     /*
      * INSIRA O timings AQUI,
      * dentro do evento completed.
@@ -488,7 +493,7 @@ try {
     },
 
     message:
-      `${recoveredResults.filesFound} arquivo(s) recuperado(s).`,
+      `${recoveredResults.filesFound} arquivo(s) correspondente(s) aos filtros.`,
   });
 } catch (resultError) {
   clearActiveRecovery();

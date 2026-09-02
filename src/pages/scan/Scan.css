@@ -1369,3 +1369,136 @@
     transform: translateX(320%);
   }
 }
+
+.source-folder-field {
+  align-items: stretch;
+}
+
+.source-folder-input {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  overflow: hidden;
+  background-color: #ffffff;
+  border: 1px solid #dfe3eb;
+  border-radius: 10px;
+  box-sizing: border-box;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.source-folder-input:focus-within {
+  border-color: #6d5dfc;
+  box-shadow:
+    0 0 0 3px rgb(109 93 252 / 14%);
+}
+
+.source-folder-input.has-error {
+  border-color: #ef4444;
+  box-shadow:
+    0 0 0 3px rgb(239 68 68 / 10%);
+}
+
+.source-folder-input > svg {
+  margin-left: 12px;
+  flex-shrink: 0;
+  color: #6d5dfc;
+}
+
+.source-folder-input input {
+  width: 100%;
+  min-width: 0;
+  padding: 11px 10px;
+  overflow: hidden;
+  color: #172033;
+  background-color: transparent;
+  border: 0;
+  outline: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.source-folder-input input::placeholder {
+  color: #94a3b8;
+}
+
+.source-folder-input input:disabled {
+  background-color: transparent;
+  border: 0;
+  opacity: 1;
+  cursor: not-allowed;
+}
+
+.source-folder-input.is-disabled {
+  background-color: #f8fafc;
+  opacity: 0.7;
+}
+
+.source-folder-clear {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  padding: 0;
+  color: #64748b;
+  background-color: transparent;
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+  place-items: center;
+}
+
+.source-folder-clear:hover:not(:disabled) {
+  color: #b91c1c;
+  background-color: #fee2e2;
+}
+
+.source-folder-browse {
+  align-self: stretch;
+  flex-shrink: 0;
+  padding: 0 14px;
+  color: #4338ca;
+  background-color: #f5f3ff;
+  border: 0;
+  border-left: 1px solid #ddd6fe;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.source-folder-browse:hover:not(:disabled) {
+  color: #3730a3;
+  background-color: #ede9fe;
+}
+
+.source-folder-browse:disabled,
+.source-folder-clear:disabled {
+  cursor: not-allowed;
+}
+
+.source-folder-status,
+.source-folder-error {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.source-folder-status {
+  color: #15803d !important;
+}
+
+.source-folder-error {
+  color: #b91c1c !important;
+}
+
+@media (max-width: 600px) {
+  .source-folder-browse {
+    padding: 0 10px;
+  }
+}

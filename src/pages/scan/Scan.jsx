@@ -256,6 +256,8 @@ function Scan() {
     const [isRecoveryConfigModalOpen, setIsRecoveryConfigModalOpen] = useState(false)
 
     const [recoverySourceFolder, setRecoverySourceFolder] = useState("")
+    const [isSelectingSourceFolder, setIsSelectingSourceFolder] = useState(false)
+    const [sourceFolderError, setSourceFolderError] = useState("")
 
     const [recoveryStartedAt,setRecoveryStartedAt] = useState(null);
 
@@ -460,6 +462,80 @@ function handleCloseRecoveryConfig() {
     }
 }
 
+
+async function handleSelectSourceFolder() {
+  if (!selectedDrive) {
+    setSourceFolderError(
+      "Selecione primeiro o disco de origem.",
+    );
+
+    return;
+  }
+
+  if (!window.desktopAPI?.selectSourceFolder) {
+    setSourceFolderError(
+      "A seleção da pasta de origem não está disponível.",
+    );
+
+    return;
+  }
+
+  setIsSelectingSourceFolder(true);
+  setSourceFolderError("");
+
+  try {
+    const selectedPath =
+      await window.desktopAPI
+        .selectSourceFolder();
+
+    if (!selectedPath) {
+      return;
+    }
+
+    const folderDrive =
+      extractDriveLetter(selectedPath);
+
+    const selectedDriveLetter =
+      selectedDrive.letter.toUpperCase();
+
+    if (
+      !folderDrive ||
+      folderDrive !== selectedDriveLetter
+    ) {
+      setSourceFolderError(
+        `Escolha uma pasta localizada no disco ${selectedDriveLetter}.`,
+      );
+
+      return;
+    }
+
+    setRecoverySourceFolder(selectedPath);
+    setRecoveryCommandPreview(null);
+  } catch (selectionError) {
+    setSourceFolderError(
+      selectionError instanceof Error
+        ? selectionError.message
+        : "Não foi possível selecionar a pasta de origem.",
+    );
+  } finally {
+    setIsSelectingSourceFolder(false);
+  }
+}
+
+function handleClearSourceFolder() {
+  if (
+    isSelectingSourceFolder ||
+    isPreparingRecovery ||
+    isScanActive
+  ) {
+    return;
+  }
+
+  setRecoverySourceFolder("");
+  setSourceFolderError("");
+  setRecoveryCommandPreview(null);
+}
+
  async function handlePrepareRecovery() {
   if (!selectedDrive) {
     setRecoveryCommandError(
@@ -602,6 +678,21 @@ const handleRecoveryUpdate =
       update.recoveryId;
 
     setScanState((currentState) => {
+        const terminalStatuses = [
+          "completed",
+          "failed",
+          "cancelled",
+        ];
+
+        if (
+          terminalStatuses.includes(
+            currentState.status,
+          ) &&
+          update.type === "output"
+        ) {
+          return currentState;
+        }
+      
       const shouldUpdateMessage =
         update.type !== "output" &&
         typeof update.message === "string";
@@ -870,6 +961,8 @@ function handleSelectDrive(driveId) {
 
     setRecoveryCommandPreview(null);
     setRecoveryCommandError("");
+    setRecoverySourceFolder("");
+  setSourceFolderError("");
   }
 
   setSelectedDriveId(driveId);
@@ -2034,29 +2127,111 @@ useEffect(() => {
                         </small>
                         </label>
 
-                        <label className="file-group-field">
-                                <span>Pasta de origem</span>
+                       <div className="file-group-field source-folder-field">
+                            <span>Pasta de origem</span>
 
-                                <input
-                                    type="text"
-                                    value={recoverySourceFolder}
-                                     disabled={
-                                                    isPreparingRecovery ||
-                                                    isScanActive
-                                                }
-                                    onChange={(event) =>
-                                    setRecoverySourceFolder(
-                                        event.target.value,
-                                    )
-                                    }
-                                    placeholder="\RecoveryTest\"
+                            <div
+                              className={[
+                                "source-folder-input",
+                                sourceFolderError
+                                  ? "has-error"
+                                  : "",
+                                isSelectingSourceFolder ||
+                                isPreparingRecovery ||
+                                isScanActive
+                                  ? "is-disabled"
+                                  : "",
+                              ]
+                                .filter(Boolean)
+                                .join(" ")}
+                            >
+                              <FolderOpen
+                                size={18}
+                                aria-hidden="true"
+                              />
+
+                              <input
+                                type="text"
+                                readOnly
+                                value={recoverySourceFolder}
+                                placeholder="Nenhuma pasta selecionada"
+                                title={
+                                  recoverySourceFolder ||
+                                  "Selecione uma pasta de origem"
+                                }
+                                disabled={
+                                  isSelectingSourceFolder ||
+                                  isPreparingRecovery ||
+                                  isScanActive
+                                }
+                                onClick={handleSelectSourceFolder}
+                                aria-invalid={
+                                  Boolean(sourceFolderError)
+                                }
+                              />
+
+                              {recoverySourceFolder && (
+                                <button
+                                  type="button"
+                                  className="source-folder-clear"
+                                  onClick={handleClearSourceFolder}
+                                  disabled={
+                                    isPreparingRecovery ||
+                                    isScanActive
+                                  }
+                                  aria-label="Remover pasta selecionada"
+                                  title="Remover pasta"
+                                >
+                                  <X size={16} />
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                className="source-folder-browse"
+                                onClick={handleSelectSourceFolder}
+                                disabled={
+                                  isSelectingSourceFolder ||
+                                  isPreparingRecovery ||
+                                  isScanActive
+                                }
+                              >
+                                {isSelectingSourceFolder
+                                  ? "Abrindo..."
+                                  : recoverySourceFolder
+                                    ? "Alterar"
+                                    : "Selecionar"}
+                              </button>
+                            </div>
+
+                            {sourceFolderError ? (
+                              <small
+                                className="source-folder-error"
+                                role="alert"
+                              >
+                                <AlertTriangle
+                                  size={14}
+                                  aria-hidden="true"
                                 />
 
-                                <small>
-                                    Opcional. Deixe vazio para analisar
-                                    todo o disco.
-                                </small>
-                        </label>
+                                <span>{sourceFolderError}</span>
+                              </small>
+                            ) : recoverySourceFolder ? (
+                              <small className="source-folder-status">
+                                <CheckCircle2
+                                  size={14}
+                                  aria-hidden="true"
+                                />
+
+                                Pasta válida no disco de origem.
+                              </small>
+                            ) : (
+                              <small>
+                                Opcional. Sem uma pasta selecionada,
+                                todo o disco será analisado.
+                              </small>
+                            )}
+                          </div>
 
                         {recoveryCommandError && (
                         <div

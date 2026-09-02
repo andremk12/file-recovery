@@ -11,6 +11,44 @@ const MAX_VISIBLE_RESULTS = 2000;
 
 const FILE_STAT_CONCURRENCY = 24;
 
+function createResultFilterSuffixes(
+  filters = [],
+) {
+  if (!Array.isArray(filters)) {
+    return [];
+  }
+
+  return filters
+    .filter(
+      (filter) =>
+        typeof filter === "string" &&
+        filter.startsWith("*."),
+    )
+    .map(
+      (filter) =>
+        filter
+          .slice(1)
+          .toLowerCase(),
+    );
+}
+
+function matchesResultFilters(
+  fileName,
+  filterSuffixes,
+) {
+  if (filterSuffixes.length === 0) {
+    return true;
+  }
+
+  const normalizedName =
+    fileName.toLowerCase();
+
+  return filterSuffixes.some(
+    (suffix) =>
+      normalizedName.endsWith(suffix),
+  );
+}
+
 async function mapWithConcurrency(
   items,
   concurrency,
@@ -135,6 +173,7 @@ async function walkRecoveryFolder(
   directoryPath,
   recoveryRoot,
   accumulator,
+  resultFilterSuffixes
 ) {
   let entries;
 
@@ -168,6 +207,18 @@ async function walkRecoveryFolder(
       continue;
     }
 
+
+    accumulator.filesRecoveredByEngine += 1;
+
+    if (
+      !matchesResultFilters(
+        entry.name,
+        resultFilterSuffixes,
+      )
+    ) {
+      continue;
+    }
+
     accumulator.totalFiles += 1;
 
     if (
@@ -192,6 +243,9 @@ async function walkRecoveryFolder(
             `${fullPath}:` +
             `${fileStats.size}:` +
             `${fileStats.mtimeMs}`,
+
+          filesRecoveredByEngine: accumulator.filesRecoveredByEngine,
+          fileFilteredOut: accumulator.filesRecoveredByEngine - accumulator.totalFiles,
 
           name:
             path.basename(fullPath),
@@ -228,6 +282,7 @@ async function walkRecoveryFolder(
       childDirectory,
       recoveryRoot,
       accumulator,
+      resultFilterSuffixes
     );
   }
 }
@@ -237,6 +292,7 @@ export async function collectRecoveredResults({
   destinationDrive,
   previousFolders = [],
   startedAt = 0,
+  resultFilters = []
 }) {
   const folders =
     await getRecoveryFolders({
@@ -281,8 +337,11 @@ export async function collectRecoveredResults({
       });
   }
 
+  const resultFilterSuffixes = createResultFilterSuffixes(resultFilters);
+
   const accumulator = {
     totalFiles: 0,
+    filesRecoveredByEngine: 0,
     results: [],
   };
 
@@ -294,6 +353,7 @@ export async function collectRecoveredResults({
       folder.path,
       folder.path,
       accumulator,
+      resultFilterSuffixes
     );
   }
 

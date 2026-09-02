@@ -219,29 +219,17 @@ const sourceFolder =
     sourceDrive,
   );
 
-/*
- * Combina pasta e extensão.
- *
- * Exemplo:
- * \RecoveryTest\*.txt
- */
-const filters = sourceFolder
-  ? extensionFilters.length > 0
-    ? extensionFilters.map(
-        (filter) =>
-          `${sourceFolder}${filter}`,
-      )
-    : [sourceFolder]
+if (!sourceFolder) {
+  throw new Error(
+    "Selecione uma pasta de origem. " +
+      "A recuperação no disco inteiro não está habilitada.",
+  );
+}
+
+const engineFilters = sourceFolder
+  ? [sourceFolder]
   : extensionFilters;
 
-/*
- * Aqui deve ser destinationPath, e não
- * destinationDrive.
- *
- * O spawn recebe cada item do array como
- * um argumento separado, portanto não coloque
- * aspas manualmente.
- */
 const args = [
   sourceDrive,
   destinationPath,
@@ -249,7 +237,7 @@ const args = [
   "/a",
 ];
 
-for (const filter of filters) {
+for (const filter of engineFilters) {
   args.push("/n", filter);
 }
 
@@ -268,7 +256,8 @@ return {
     destinationPath,
 
   mode,
-  filters,
+  filters: engineFilters,
+  resultFilters: extensionFilters,
 
   displayCommand: [
     "winfr.exe",
