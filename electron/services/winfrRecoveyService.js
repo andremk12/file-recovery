@@ -415,72 +415,97 @@ let recoveryFoldersBefore = [];
         return;
       }
 
-      try {
-        emit({
-          type: "finalizing",
-          status: "running",
-          progress: 100,
-          message:
-            "Organizando os arquivos recuperados...",
-        });
+   const engineFinishedAt =
+  Date.now();
 
-        const recoveredResults =
-          await collectRecoveredResults({
-            destinationPath:
-              command.destinationFolder,
+try {
+  emit({
+    type: "finalizing",
+    status: "running",
+    progress: 100,
+    message:
+      "Organizando os arquivos recuperados...",
+  });
 
-            destinationDrive:
-              command.destinationDrive,
+  /*
+   * Agora começa a leitura e organização
+   * dos arquivos recuperados pelo Node.
+   */
+  const recoveredResults =
+    await collectRecoveredResults({
+      destinationPath:
+        command.destinationFolder,
 
-            previousFolders:
-              operation.recoveryFoldersBefore,
+      previousFolders:
+        operation.recoveryFoldersBefore,
 
-            startedAt:
-              operation.startedAt,
-          });
+      startedAt:
+        operation.startedAt,
+    });
 
-        clearActiveRecovery();
+  /*
+   * Neste momento a organização terminou.
+   */
+  const resultIndexFinishedAt =
+    Date.now();
 
-        emit({
-          type: "completed",
-          status: "completed",
-          progress: 100,
-          exitCode,
-          signal,
+  clearActiveRecovery();
 
-          destinationFolder:
-            command.destinationFolder,
+  emit({
+    type: "completed",
+    status: "completed",
+    progress: 100,
+    exitCode,
+    signal,
 
-          filesFound:
-            recoveredResults.filesFound,
+    destinationFolder:
+      command.destinationFolder,
 
-          results:
-            recoveredResults.results,
+    filesFound:
+      recoveredResults.filesFound,
 
-          resultsTruncated:
-            recoveredResults.resultsTruncated,
+    results:
+      recoveredResults.results,
 
-          recoveryFolders:
-            recoveredResults.recoveryFolders,
+    resultsTruncated:
+      recoveredResults.resultsTruncated,
 
-          message:
-            `${recoveredResults.filesFound} arquivo(s) recuperado(s).`,
-        });
-      } catch (resultError) {
-        clearActiveRecovery();
+    recoveryFolders:
+      recoveredResults.recoveryFolders,
 
-        emit({
-          type: "failed",
-          status: "failed",
-          progress: 100,
-          exitCode,
-          signal,
-          message:
-            resultError instanceof Error
-              ? `A recuperação terminou, mas não foi possível processar os resultados: ${resultError.message}`
-              : "A recuperação terminou, mas não foi possível processar os resultados.",
-        });
-      }
+    /*
+     * INSIRA O timings AQUI,
+     * dentro do evento completed.
+     */
+    timings: {
+      engineMs:
+        engineFinishedAt -
+        operation.startedAt,
+
+      resultIndexMs:
+        resultIndexFinishedAt -
+        engineFinishedAt,
+    },
+
+    message:
+      `${recoveredResults.filesFound} arquivo(s) recuperado(s).`,
+  });
+} catch (resultError) {
+  clearActiveRecovery();
+
+  emit({
+    type: "failed",
+    status: "failed",
+    progress: 100,
+    exitCode,
+    signal,
+
+    message:
+      resultError instanceof Error
+        ? `A recuperação terminou, mas não foi possível processar os resultados: ${resultError.message}`
+        : "A recuperação terminou, mas não foi possível processar os resultados.",
+  });
+}
     },
   );
 

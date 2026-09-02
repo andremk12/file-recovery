@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef} from "react";
 import { HardDrive, RefreshCw, CheckCircle2, FolderOpen, AlertTriangle, XCircle, X, Search, FileText, Settings2} from "lucide-react";
 import "./Scan.css"
 
@@ -12,15 +12,16 @@ const DRIVE_TYPE_LABELS = {
 }
 
 const INITIAL_SCAN_STATE = {
-    scanId: null,
-    status: "idle",
-    progress: 0,
-    phase: "",
-    message: "",
-    filesFound: 0,
-    elapsedMs: 0,
-    results: [],
-}
+  scanId: null,
+  status: "idle",
+  progress: 0,
+  phase: "",
+  message: "",
+  filesFound: 0,
+  elapsedMs: 0,
+  results: [],
+  timings: null,
+};
 
 const RECOVERABILITY_LABELS = {
   high: "Alta",
@@ -167,47 +168,6 @@ function calculateUsedPercentage(drive) {
     return Math.min(Math.max(percentage, 0), 100)
 }
 
-function buildRecoveryFilters(
-  fileGroup,
-  sourceFolder,
-) {
-  const group =
-    RECOVERY_FILE_GROUPS[fileGroup];
-
-  if (!group) {
-    return [];
-  }
-
-  const rawFolder =
-    typeof sourceFolder === "string"
-      ? sourceFolder.trim()
-      : "";
-
-  if (!rawFolder) {
-    return group.filters;
-  }
-
-  let folder =
-    rawFolder.replace(/\//g, "\\");
-
-  if (!folder.startsWith("\\")) {
-    folder = `\\${folder}`;
-  }
-
-  if (!folder.endsWith("\\")) {
-    folder += "\\";
-  }
-
-  if (group.filters.length === 0) {
-    return [folder];
-  }
-
-  return group.filters.map(
-    (filter) =>
-      `${folder}${filter}`,
-  );
-}
-
 function getRecoveryDisplayMessage(
   message,
   status,
@@ -266,6 +226,8 @@ function getAutomaticRecoveryMode(drive) {
     : "extensive";
 }
 
+
+
 function Scan() {
 
     const [drives, setDrives] = useState([])
@@ -298,6 +260,75 @@ function Scan() {
     const [recoveryStartedAt,setRecoveryStartedAt] = useState(null);
 
     const [ liveElapsedMs, setLiveElapsedMs] = useState(0);
+
+const activeRecoveryIdRef = useRef(null);
+    useEffect(() => {
+  let disposed = false;
+
+  async function restoreActiveRecovery() {
+    if (
+      !window.desktopAPI
+        ?.getActiveRealRecovery
+    ) {
+      return;
+    }
+
+    try {
+      const activeRecovery =
+        await window.desktopAPI
+          .getActiveRealRecovery();
+
+      if (
+        disposed ||
+        !activeRecovery
+      ) {
+        return;
+      }
+
+      activeRecoveryIdRef.current =
+        activeRecovery.recoveryId;
+
+      setRecoveryStartedAt(
+        activeRecovery.startedAt,
+      );
+
+      setLiveElapsedMs(
+        Date.now() -
+          activeRecovery.startedAt,
+      );
+
+      setScanState({
+        ...INITIAL_SCAN_STATE,
+
+        scanId:
+          activeRecovery.recoveryId,
+
+        status:
+          activeRecovery.status ??
+          "running",
+
+        message:
+          "Recuperação em andamento...",
+      });
+
+      setIsScanModalOpen(true);
+    } catch (recoveryError) {
+      if (!disposed) {
+        setScanError(
+          recoveryError instanceof Error
+            ? recoveryError.message
+            : "Não foi possível restaurar a recuperação ativa.",
+        );
+      }
+    }
+  }
+
+  void restoreActiveRecovery();
+
+  return () => {
+    disposed = true;
+  };
+}, []);
 
     function handleOpenRecoveryConfig() {
   setRecoveryCommandError("");
@@ -429,55 +460,58 @@ function handleCloseRecoveryConfig() {
     }
 }
 
-    async function handlePrepareRecovery() {
-        if (!selectedDrive) {
-            setRecoveryCommandError("Selecione o disco de origem")
-            return
-        }
+ async function handlePrepareRecovery() {
+  if (!selectedDrive) {
+    setRecoveryCommandError(
+      "Selecione o disco de origem.",
+    );
 
+    return;
+  }
 
-         if (!destinationPath) {
-        setRecoveryCommandError("Selecione uma pasta de destino")
-        return
-    }
+  if (!destinationPath) {
+    setRecoveryCommandError(
+      "Selecione uma pasta de destino.",
+    );
 
-        if (!window.desktopAPI?.previewRecoveryCommand) {
-        setRecoveryCommandError ("A preparação da recuperação não esta disponível.")
-        return 
-    }
+    return;
+  }
 
-     const filters =
-        buildRecoveryFilters(
-            recoveryFileGroup,
-            recoverySourceFolder,
-  );
+  if (
+    !window.desktopAPI
+      ?.previewRecoveryCommand
+  ) {
+    setRecoveryCommandError(
+      "A preparação da recuperação não está disponível.",
+    );
 
-     setIsPreparingRecovery(true)
-     setRecoveryCommandError("")
-     setRecoveryCommandPreview(null)
+    return;
+  }
 
-     try {
-        const preview = await window.desktopAPI
-                        .previewRecoveryCommand(
-                            {
-                                sourceDrive: selectedDrive.letter,
-                                destinationPath,
-                                mode: recoveryMode,
-                                filters,
-                            })
-                            setRecoveryCommandPreview(preview)
-                            setIsRecoveryConfigModalOpen(false);
-            
-         } catch (preparationError) {
-            const message = preparationError instanceof Error
-                            ? preparationError.message
-                            : "Não foi possível preparar a recuperação."
-            setRecoveryCommandError(message)
-         } finally {
-            setIsPreparingRecovery(false)
-         }
+  setIsPreparingRecovery(true);
+  setRecoveryCommandError("");
+  setRecoveryCommandPreview(null);
 
-    }
+  try {
+    const request =
+      createRecoveryRequest();
+
+    const preview =
+      await window.desktopAPI
+        .previewRecoveryCommand(request);
+
+    setRecoveryCommandPreview(preview);
+    setIsRecoveryConfigModalOpen(false);
+  } catch (preparationError) {
+    setRecoveryCommandError(
+      preparationError instanceof Error
+        ? preparationError.message
+        : "Não foi possível preparar a recuperação.",
+    );
+  } finally {
+    setIsPreparingRecovery(false);
+  }
+}
 
 
     const loadDrives = useCallback(async () => {
@@ -494,6 +528,8 @@ function handleCloseRecoveryConfig() {
         setRecoveryMode("regular");
         setRecoveryFileGroup("all");
         setIsRecoveryConfigModalOpen(false);
+
+         setRecoverySourceFolder("");
 
         setScanState({
             ...INITIAL_SCAN_STATE,
@@ -539,6 +575,108 @@ function handleCloseRecoveryConfig() {
     useEffect(() => {
         loadDrives()
     }, [loadDrives])
+
+
+const handleRecoveryUpdate =
+  useCallback((update) => {
+    if (
+      !update ||
+      typeof update !== "object" ||
+      typeof update.recoveryId !== "string"
+    ) {
+      return;
+    }
+
+    const activeRecoveryId =
+      activeRecoveryIdRef.current;
+
+    if (
+      activeRecoveryId &&
+      update.recoveryId !==
+        activeRecoveryId
+    ) {
+      return;
+    }
+
+    activeRecoveryIdRef.current =
+      update.recoveryId;
+
+    setScanState((currentState) => {
+      const shouldUpdateMessage =
+        update.type !== "output" &&
+        typeof update.message === "string";
+
+      const nextProgress =
+        Number.isFinite(update.progress)
+          ? Math.min(
+              Math.max(
+                update.progress,
+                0,
+              ),
+              100,
+            )
+          : currentState.progress;
+
+      return {
+        ...currentState,
+
+        scanId:
+          update.recoveryId,
+
+        status:
+          update.status ??
+          currentState.status,
+
+        progress:
+          nextProgress,
+
+        message:
+          shouldUpdateMessage
+            ? update.message
+            : currentState.message,
+
+        elapsedMs:
+          update.elapsedMs ??
+          currentState.elapsedMs,
+
+        filesFound:
+          update.filesFound ??
+          currentState.filesFound,
+
+        results:
+          Array.isArray(update.results)
+            ? update.results
+            : currentState.results,
+
+        timings:
+          update.timings ??
+          currentState.timings,
+      };
+    });
+
+    if (
+      Number.isFinite(update.elapsedMs)
+    ) {
+      setLiveElapsedMs(
+        update.elapsedMs,
+      );
+    }
+
+    if (update.type === "completed") {
+      setShowScanResults(true);
+    }
+
+    if (update.type === "failed") {
+      setScanError(
+        update.message ||
+          "A recuperação falhou.",
+      );
+    }
+
+    if (update.type === "cancelled") {
+      setScanError("");
+    }
+  }, []);
 
 
    useEffect(() => {
@@ -618,6 +756,54 @@ function handleCloseRecoveryConfig() {
         (drive) => drive.id === selectedDriveId,
     )
 
+    const selectedFileSystem =
+  selectedDrive?.fileSystem
+    ?.trim()
+    .toUpperCase() ?? "";
+
+const isFat32 =
+  selectedFileSystem === "FAT32";
+
+const requiresExtensiveMode =
+  Boolean(selectedFileSystem) &&
+  selectedFileSystem !== "NTFS";
+
+function createRecoveryRequest() {
+  if (!selectedDrive) {
+    throw new Error(
+      "Selecione o disco de origem.",
+    );
+  }
+
+  const selectedGroup =
+    RECOVERY_FILE_GROUPS[
+      recoveryFileGroup
+    ] ?? RECOVERY_FILE_GROUPS.all;
+
+  return {
+    sourceDrive:
+      selectedDrive.letter,
+
+    sourceFolder:
+      recoverySourceFolder.trim(),
+
+    destinationPath,
+
+    /*
+     * Esta validação duplica intencionalmente
+     * a regra visual, evitando uma condição
+     * de corrida no estado do React.
+     */
+    mode:
+      requiresExtensiveMode
+        ? "extensive"
+        : recoveryMode,
+
+    filters:
+      [...selectedGroup.filters],
+  };
+}
+
        const isScanActive = [
         "starting",
         "running",
@@ -680,6 +866,8 @@ function handleSelectDrive(driveId) {
     setDestinationError("");
     setDestinationWarning("");
 
+     setRecoverySourceFolder("");
+
     setRecoveryCommandPreview(null);
     setRecoveryCommandError("");
   }
@@ -727,55 +915,62 @@ async function handleStartScan() {
     message: "Iniciando a recuperação...",
   });
 
-  try {
-    const filters =
-      buildRecoveryFilters(
-        recoveryFileGroup,
-        recoverySourceFolder,
-      );
+    try {
+    const request =
+        createRecoveryRequest();
+
+    /*
+    * Libera a adoção do ID enviado pelo
+    * próximo evento da recuperação.
+    */
+    activeRecoveryIdRef.current = null;
 
     const startedRecovery =
-      await window.desktopAPI.startRealRecovery({
-        sourceDrive: selectedDrive.letter,
-        destinationPath,
-        mode: recoveryMode,
-        filters,
-      });
+        await window.desktopAPI
+        .startRealRecovery(request);
+
+    activeRecoveryIdRef.current =
+        startedRecovery.recoveryId;
 
     setScanState((currentState) => ({
-      ...currentState,
+        ...currentState,
 
-      scanId: startedRecovery.recoveryId,
+        scanId:
+        startedRecovery.recoveryId,
 
-      status:
+        status:
         startedRecovery.status ??
         "starting",
 
-      progress:
+        progress:
         startedRecovery.progress ?? 0,
 
-      message:
+        message:
         "Windows File Recovery iniciado.",
     }));
-  } catch (startError) {
+    } catch (startError) {
     const message =
-      startError instanceof Error
+        startError instanceof Error
         ? startError.message
         : "Não foi possível iniciar a recuperação.";
 
     setScanState({
-      ...INITIAL_SCAN_STATE,
-      status: "failed",
-      message,
+        ...INITIAL_SCAN_STATE,
+        status: "failed",
+        message,
     });
 
     setScanError(message);
-  }
+    }
 }
 
 async function handleCancelScan() {
+  const recoveryId =
+    activeRecoveryIdRef.current ??
+    scanState.scanId;
+
   if (
-    !scanState.scanId ||
+    !recoveryId ||
     !window.desktopAPI?.cancelRealRecovery
   ) {
     return;
@@ -789,27 +984,46 @@ async function handleCancelScan() {
     message: "Cancelando a recuperação...",
   }));
 
+  let timeoutId;
+
   try {
-    const result =
-      await window.desktopAPI.cancelRealRecovery(
-        scanState.scanId,
-      );
+    const result = await Promise.race([
+      window.desktopAPI.cancelRealRecovery(
+        recoveryId,
+      ),
 
-    if (!result.cancelled) {
-      setScanState((currentState) => ({
-        ...currentState,
-        status: "running",
-      }));
+      new Promise((_, reject) => {
+        timeoutId = window.setTimeout(() => {
+          reject(
+            new Error(
+              "O Electron não respondeu ao pedido de cancelamento.",
+            ),
+          );
+        }, 10_000);
+      }),
+    ]);
 
-      setScanError(
-        result.message ||
+    if (!result?.cancelled) {
+      throw new Error(
+        result?.message ||
           "Não foi possível cancelar a recuperação.",
       );
     }
+
+    setScanState((currentState) => ({
+      ...currentState,
+      status: "cancelled",
+      message:
+        result.message ||
+        "Recuperação cancelada.",
+    }));
+
+    setScanError("");
   } catch (cancelError) {
     setScanState((currentState) => ({
       ...currentState,
       status: "running",
+      message: "Recuperação em andamento...",
     }));
 
     setScanError(
@@ -817,6 +1031,10 @@ async function handleCancelScan() {
         ? cancelError.message
         : "Não foi possível cancelar a recuperação.",
     );
+  } finally {
+    if (timeoutId) {
+      window.clearTimeout(timeoutId);
+    }
   }
 }
 
@@ -913,6 +1131,17 @@ useEffect(() => {
   isPreparingRecovery,
 ]);
 
+useEffect(() => {
+  if (
+    requiresExtensiveMode &&
+    recoveryMode !== "extensive"
+  ) {
+    setRecoveryMode("extensive");
+  }
+}, [
+  requiresExtensiveMode,
+  recoveryMode,
+]);
     return (
         <section className="page">
             <header className="scan-header">
@@ -1265,6 +1494,7 @@ useEffect(() => {
             className={`scan-modal is-${scanState.status}`}
             role="dialog"
             aria-modal="true"
+            aria-busy={isScanActive}
             aria-labelledby="scan-modal-title"
             aria-describedby="scan-modal-description"
             >
@@ -1654,67 +1884,129 @@ useEffect(() => {
 
                     <div className="recovery-options">
                         <fieldset className="mode-options">
-                        <legend>
-                            Modo de recuperação
-                        </legend>
+                            <legend>
+                                Modo de recuperação
+                            </legend>
 
-                    <label
-                        className={
-                            recoveryMode === "regular"
-                            ? "mode-option is-selected"
-                            : "mode-option"
-                        }
-                        >
-                        <input
-                            type="radio"
-                            name="recovery-mode"
-                            value="regular"
-                            checked={recoveryMode === "regular"}
-                            disabled
-                            readOnly
-                        />
+                            <label
+                                className={[
+                                "mode-option",
+                                recoveryMode === "regular"
+                                    ? "is-selected"
+                                    : "",
+                                requiresExtensiveMode
+                                    ? "is-disabled"
+                                    : "",
+                                ]
+                                .filter(Boolean)
+                                .join(" ")}
+                                aria-disabled={
+                                requiresExtensiveMode
+                                }
+                            >
+                                <input
+                                type="radio"
+                                name="recovery-mode"
+                                value="regular"
+                                checked={
+                                    recoveryMode === "regular"
+                                }
+                                onChange={() =>
+                                    setRecoveryMode("regular")
+                                }
+                                disabled={
+                                    requiresExtensiveMode ||
+                                    isPreparingRecovery ||
+                                    isScanActive
+                                }
+                                />
 
-                        <span>
-                            <strong>Regular</strong>
+                                <span>
+                                <strong>Regular</strong>
 
-                            <small>
-                            Usado automaticamente para discos NTFS.
-                            </small>
-                        </span>
-                                        </label>
+                                <small>
+                                    Recomendado para arquivos
+                                    excluídos recentemente em NTFS.
+                                </small>
+                                </span>
+                            </label>
 
-                                        <label
-                    className={
-                        recoveryMode === "extensive"
-                        ? "mode-option is-selected"
-                        : "mode-option"
-                    }
-                    >
-                    <input
-                        type="radio"
-                        name="recovery-mode"
-                        value="extensive"
-                        checked={recoveryMode === "extensive"}
-                        disabled
-                        readOnly
-                    />
+                            <label
+                                className={[
+                                "mode-option",
+                                recoveryMode === "extensive"
+                                    ? "is-selected"
+                                    : "",
+                                requiresExtensiveMode
+                                    ? "is-forced"
+                                    : "",
+                                ]
+                                .filter(Boolean)
+                                .join(" ")}
+                            >
+                                <input
+                                type="radio"
+                                name="recovery-mode"
+                                value="extensive"
+                                checked={
+                                    recoveryMode === "extensive"
+                                }
+                                onChange={() =>
+                                    setRecoveryMode("extensive")
+                                }
+                                disabled={
+                                    isPreparingRecovery ||
+                                    isScanActive
+                                }
+                                />
 
-                    <span>
-                        <strong>Extensivo</strong>
+                                <span>
+                                <strong>
+                                    Recuperação Extensa
+                                </strong>
 
-                        <small>
-                        Usado automaticamente para FAT32, exFAT
-                        e outros sistemas de arquivos.
-                        </small>
-                    </span>
-                    </label>
-                        </fieldset>
+                                <small>
+                                    Necessária para FAT32 e exFAT;
+                                    também pode ser usada em NTFS.
+                                </small>
+                                </span>
+                            </label>
+                            </fieldset>
+
+                            {isFat32 && (
+                            <div
+                                className="filesystem-rule-alert"
+                                role="status"
+                                aria-live="polite"
+                            >
+                                <AlertTriangle
+                                size={20}
+                                aria-hidden="true"
+                                />
+
+                                <div>
+                                <strong>
+                                    FAT32 exige Recuperação Extensa
+                                </strong>
+
+                                <p>
+                                    O modo Regular foi desabilitado
+                                    automaticamente porque não é
+                                    compatível com esta unidade.
+                                </p>
+                                </div>
+                            </div>
+                            )}
 
                         <label className="file-group-field">
                         <span>Tipos de arquivo</span>
 
                         <select
                             value={recoveryFileGroup}
+                            disabled={
+                                        isPreparingRecovery ||
+                                        isScanActive
+                                    }
                             onChange={(event) =>
                             setRecoveryFileGroup(
                                 event.target.value,
@@ -1748,6 +2040,10 @@ useEffect(() => {
                                 <input
                                     type="text"
                                     value={recoverySourceFolder}
+                                     disabled={
+                                                    isPreparingRecovery ||
+                                                    isScanActive
+                                                }
                                     onChange={(event) =>
                                     setRecoverySourceFolder(
                                         event.target.value,

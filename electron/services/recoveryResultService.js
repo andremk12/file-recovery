@@ -9,37 +9,60 @@ const RECOVERY_FOLDER_PATTERN =
 
 const MAX_VISIBLE_RESULTS = 2000;
 
-function getCandidateRoots(
-  destinationPath,
-  destinationDrive,
+const FILE_STAT_CONCURRENCY = 24;
+
+async function mapWithConcurrency(
+  items,
+  concurrency,
+  worker,
 ) {
-  const candidates = [
-    destinationPath,
-    `${destinationDrive}\\`,
-  ].filter(Boolean);
-
-  const uniqueRoots = new Map();
-
-  for (const candidate of candidates) {
-    const resolved = path.resolve(candidate);
-
-    uniqueRoots.set(
-      resolved.toLowerCase(),
-      resolved,
-    );
+  if (items.length === 0) {
+    return;
   }
 
-  return [...uniqueRoots.values()];
+  let nextIndex = 0;
+
+  const workerCount =
+    Math.min(
+      concurrency,
+      items.length,
+    );
+
+  const workers =
+    Array.from(
+      { length: workerCount },
+      async () => {
+        while (nextIndex < items.length) {
+          const currentIndex =
+            nextIndex;
+
+          nextIndex += 1;
+
+          await worker(
+            items[currentIndex],
+          );
+        }
+      },
+    );
+
+  await Promise.all(workers);
+}
+
+function getCandidateRoots(destinationPath) {
+  if (!destinationPath) {
+    return [];
+  }
+
+  return [
+    path.win32.normalize(destinationPath),
+  ];
 }
 
 async function getRecoveryFolders({
   destinationPath,
   destinationDrive,
 }) {
-  const roots = getCandidateRoots(
-    destinationPath,
-    destinationDrive,
-  );
+  const roots = getCandidateRoots(destinationPath);
 
   const folders = [];
 
@@ -126,6 +149,9 @@ async function walkRecoveryFolder(
     return;
   }
 
+  const directories = [];
+  const visibleFiles = [];
+
   for (const entry of entries) {
     const fullPath =
       path.join(
@@ -134,12 +160,7 @@ async function walkRecoveryFolder(
       );
 
     if (entry.isDirectory()) {
-      await walkRecoveryFolder(
-        fullPath,
-        recoveryRoot,
-        accumulator,
-      );
-
+      directories.push(fullPath);
       continue;
     }
 
@@ -150,39 +171,64 @@ async function walkRecoveryFolder(
     accumulator.totalFiles += 1;
 
     if (
-      accumulator.results.length >=
+      accumulator.results.length +
+        visibleFiles.length <
       MAX_VISIBLE_RESULTS
     ) {
-      continue;
+      visibleFiles.push(fullPath);
     }
+  }
 
-    try {
-      const fileStats =
-        await stat(fullPath);
+  await mapWithConcurrency(
+    visibleFiles,
+    FILE_STAT_CONCURRENCY,
+    async (fullPath) => {
+      try {
+        const fileStats =
+          await stat(fullPath);
 
-      accumulator.results.push({
-        id: `${fullPath}:${fileStats.size}:${fileStats.mtimeMs}`,
+        accumulator.results.push({
+          id:
+            `${fullPath}:` +
+            `${fileStats.size}:` +
+            `${fileStats.mtimeMs}`,
 
-        name: entry.name,
+          name:
+            path.basename(fullPath),
 
-        recoveredPath: fullPath,
-
-        relativePath:
-          path.relative(
-            recoveryRoot,
+          recoveredPath:
             fullPath,
-          ),
 
-        sizeBytes:
-          fileStats.size,
+          relativePath:
+            path.relative(
+              recoveryRoot,
+              fullPath,
+            ),
 
-        recoverability:
-          "recovered",
-      });
-    } catch {
-      // Arquivo pode ter sido alterado
-      // durante a leitura.
-    }
+          sizeBytes:
+            fileStats.size,
+
+          recoverability:
+            "recovered",
+        });
+      } catch {
+        // O arquivo pode ter sido movido
+        // durante o processamento.
+      }
+    },
+  );
+
+  /*
+   * Mantemos a recursão de diretórios
+   * sequencial para não gerar milhares de
+   * leituras simultâneas.
+   */
+  for (const childDirectory of directories) {
+    await walkRecoveryFolder(
+      childDirectory,
+      recoveryRoot,
+      accumulator,
+    );
   }
 }
 

@@ -13,19 +13,29 @@ contextBridge.exposeInMainWorld("desktopAPI", {
     startRealRecovery: (request) => ipcRenderer.invoke("recovery:start-real", request),
     cancelRealRecovery: (recoveryId) => ipcRenderer.invoke("recovery:cancel-real", recoveryId),
     getActiveRealRecovery: () => ipcRenderer.invoke("recovery:get-active-real"),
-    onRealRecoveryUpdate: (callBack) => {
-        const listener = (_event, update) => {
-            callBack(update)
-        }
+    onRealRecoveryUpdate: (callback) => {
+            if (typeof callback !== "function") {
+                throw new TypeError(
+                "O callback da recuperação é inválido.",
+                );
+            }
 
-        ipcRenderer.on("recovery:real-update", listener)
+            const listener = (_event, update) => {
+                callback(update);
+            };
 
-        return () => {
-            ipcRenderer.removeListener(
-                "recovery:real-update", listener
-            )
-        }
-    },
+            ipcRenderer.on(
+                "recovery:real-update",
+                listener,
+            );
+
+            return () => {
+                ipcRenderer.removeListener(
+                "recovery:real-update",
+                listener,
+                );
+            };
+            },
 
     onScanUpdate: (callBack) => {
         if (typeof callBack !== "function") {
@@ -46,5 +56,10 @@ contextBridge.exposeInMainWorld("desktopAPI", {
                 listener
             )
         }
-    }
+    },
+
+    selectSourceFolder: () =>
+    ipcRenderer.invoke(
+    "recovery:select-source-folder",
+  ),
 })
