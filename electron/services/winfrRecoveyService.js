@@ -545,7 +545,7 @@ try {
     recoveryFolders:
       recoveredResults.recoveryFolders,
 
-    filesRecoveryByEngine: recoveredResults.filesRecoveryByEngine,
+    filesRecoveredByEngine: recoveredResults.filesRecoveredByEngine,
     filesFilteredOut: recoveredResults.filesFilteredOut,
 
     /*

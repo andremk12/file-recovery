@@ -244,9 +244,7 @@ async function walkRecoveryFolder(
             `${fileStats.size}:` +
             `${fileStats.mtimeMs}`,
 
-          filesRecoveredByEngine: accumulator.filesRecoveredByEngine,
-          fileFilteredOut: accumulator.filesRecoveredByEngine - accumulator.totalFiles,
-
+  
           name:
             path.basename(fullPath),
 
@@ -368,6 +366,13 @@ export async function collectRecoveredResults({
   return {
     filesFound:
       accumulator.totalFiles,
+
+    filesRecoveredByEngine: 
+      accumulator.filesRecoveredByEngine,
+    
+    fileFilteredOut: 
+      accumulator.filesRecoveredByEngine - accumulator.totalFiles,
+
 
     results:
       accumulator.results,
