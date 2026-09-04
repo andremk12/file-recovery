@@ -5,6 +5,7 @@ import { registerDriveIpc } from "./ipc/driveIpc.js"
 import { registerDestinationIpc } from "./ipc/destinationIpc.js";
 import { registerScanIpc } from "./ipc/scanIpc.js";
 import { registerRecoveryEngineIpc } from "./ipc/recoveryEngineIpc.js";
+import os from "node:os"
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -53,6 +54,7 @@ app.whenReady().then(() => {
       version: app.getVersion(),
       platform: process.platform,
       electronVersion: process.versions.electron,
+      userName: os.userInfo().username
     };
   });
 

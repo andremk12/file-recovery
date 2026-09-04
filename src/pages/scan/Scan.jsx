@@ -502,6 +502,10 @@ async function handleSelectSourceFolder() {
       !folderDrive ||
       folderDrive !== selectedDriveLetter
     ) {
+
+      setRecoverySourceFolder("");
+      setRecoveryCommandPreview(null);
+
       setSourceFolderError(
         `Escolha uma pasta localizada no disco ${selectedDriveLetter}.`,
       );
@@ -606,6 +610,7 @@ function handleClearSourceFolder() {
         setIsRecoveryConfigModalOpen(false);
 
          setRecoverySourceFolder("");
+         setSourceFolderError("");
 
         setScanState({
             ...INITIAL_SCAN_STATE,
@@ -770,78 +775,19 @@ const handleRecoveryUpdate =
   }, []);
 
 
-   useEffect(() => {
-  if (!window.desktopAPI?.onRealRecoveryUpdate) {
+ useEffect(() => {
+  if (
+    !window.desktopAPI
+      ?.onRealRecoveryUpdate
+  ) {
     return undefined;
   }
 
-  const removeListener =
-    window.desktopAPI.onRealRecoveryUpdate((update) => {
-
-        
-      setScanState((currentState) => {
-        if (
-          currentState.scanId &&
-          update.recoveryId !== currentState.scanId
-        ) {
-          return currentState;
-        }
-
-        return {
-          ...currentState,
-
-          scanId:
-            update.recoveryId ??
-            currentState.scanId,
-
-          status:
-            update.status ??
-            currentState.status,
-
-          progress:
-            update.progress ??
-            currentState.progress,
-
-          message:
-            update.message ??
-            currentState.message,
-
-          elapsedMs:
-            update.elapsedMs ??
-            currentState.elapsedMs,
-
-          filesFound:
-            update.filesFound ??
-            currentState.filesFound,
-
-          results:
-            Array.isArray(update.results)
-              ? update.results
-              : currentState.results,
-        };
-      });
-
-      if (
-  Number.isFinite(update.elapsedMs)
-) {
-  setLiveElapsedMs(
-    update.elapsedMs,
-  );
-}
-      if (update.type === "completed") {
-        setShowScanResults(true);
-      }
-
-      if (update.type === "failed") {
-        setScanError(
-          update.message ||
-          "A recuperação falhou.",
-        );
-      }
-    });
-
-  return removeListener;
-}, []);
+  return window.desktopAPI
+    .onRealRecoveryUpdate(
+      handleRecoveryUpdate,
+    );
+}, [handleRecoveryUpdate]);
 
     const selectedDrive = drives.find(
         (drive) => drive.id === selectedDriveId,
@@ -871,12 +817,21 @@ function createRecoveryRequest() {
       recoveryFileGroup
     ] ?? RECOVERY_FILE_GROUPS.all;
 
+  const sourceFolder =
+  recoverySourceFolder.trim();
+
+  if (!sourceFolder) {
+    throw new Error(
+      "Selecione uma pasta de origem.",
+    );
+  }
+
   return {
     sourceDrive:
       selectedDrive.letter,
 
-    sourceFolder:
-      recoverySourceFolder.trim(),
+    sourceFolder,
+      
 
     destinationPath,
 
@@ -942,9 +897,15 @@ function createRecoveryRequest() {
 ]);
 
     const canStartScan = Boolean(
-        selectedDrive && destinationPath && recoveryCommandPreview &&
-        !destinationError && !isScanActive && !isPreparingRecovery
-    )
+      selectedDrive &&
+      recoverySourceFolder.trim() &&
+      destinationPath &&
+      recoveryCommandPreview &&
+      !sourceFolderError &&
+      !destinationError &&
+      !isScanActive &&
+      !isPreparingRecovery
+  );
 
 
 function handleSelectDrive(driveId) {
@@ -961,7 +922,6 @@ function handleSelectDrive(driveId) {
 
     setRecoveryCommandPreview(null);
     setRecoveryCommandError("");
-    setRecoverySourceFolder("");
   setSourceFolderError("");
   }
 
@@ -2066,7 +2026,7 @@ useEffect(() => {
                             </label>
                             </fieldset>
 
-                            {isFat32 && (
+                            {requiresExtensiveMode && (
                             <div
                                 className="filesystem-rule-alert"
                                 role="status"
@@ -2079,7 +2039,7 @@ useEffect(() => {
 
                                 <div>
                                 <strong>
-                                    FAT32 exige Recuperação Extensa
+                                    {selectedFileSystem} exige Recuperação Extensa
                                 </strong>
 
                                 <p>
@@ -2226,10 +2186,10 @@ useEffect(() => {
                                 Pasta válida no disco de origem.
                               </small>
                             ) : (
-                              <small>
-                                Opcional. Sem uma pasta selecionada,
-                                todo o disco será analisado.
-                              </small>
+                             <small>
+                                Obrigatória. Selecione a pasta em que
+                                os arquivos estavam localizados.
+                            </small>
                             )}
                           </div>
 

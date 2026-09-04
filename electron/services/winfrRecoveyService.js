@@ -198,7 +198,7 @@ let recoveryFoldersBefore = [];
       shell: false,
       windowsHide: true,
       stdio: [
-        "ignore",
+        "pipe",
         "pipe",
         "pipe",
       ],
@@ -214,6 +214,8 @@ let recoveryFoldersBefore = [];
   let progressBuffer = "";
   let lastProgress = 0;
   let finalized = false;
+  let interactionBuffer = "";
+  let keepBothResponseSent = false;
 
   const operation = {
     recoveryId,
@@ -235,6 +237,72 @@ let recoveryFoldersBefore = [];
       ...update,
     });
   }
+
+  function handleInteractivePrompt(
+  decodedOutput,
+) {
+  interactionBuffer = (
+    interactionBuffer +
+    decodedOutput
+  )
+    .replace(/\u0000/g, "")
+    .replace(/\r/g, "\n")
+    .slice(-4096);
+
+  const isOverwritePrompt =
+    /keep\s+\(b\)oth\s+always/i.test(
+      interactionBuffer,
+    );
+
+  if (
+    !isOverwritePrompt ||
+    keepBothResponseSent
+  ) {
+    return;
+  }
+
+  if (!childProcess.stdin?.writable) {
+    emit({
+      type: "output",
+      status: "running",
+      stream: "stderr",
+      message:
+        "O WinFR solicitou uma confirmação, mas a entrada não está disponível.",
+    });
+
+    return;
+  }
+
+  keepBothResponseSent = true;
+  interactionBuffer = "";
+
+  childProcess.stdin.write(
+    "b\r\n",
+    (inputError) => {
+      if (inputError) {
+        keepBothResponseSent = false;
+
+        emit({
+          type: "output",
+          status: "running",
+          stream: "stderr",
+          message:
+            `Não foi possível responder ao WinFR: ${inputError.message}`,
+        });
+
+        return;
+      }
+
+      emit({
+        type: "interaction",
+        status: "running",
+        progress: lastProgress,
+        message:
+          "Arquivos repetidos encontrados. Mantendo todas as versões.",
+      });
+    },
+  );
+}
 
   function clearActiveRecovery() {
     if (
@@ -263,6 +331,8 @@ let recoveryFoldersBefore = [];
     (chunk) => {
       const decodedOutput =
         stdoutDecoder.write(chunk);
+
+        handleInteractivePrompt( decodedOutput);
 
       progressBuffer = (
         progressBuffer +
@@ -590,6 +660,7 @@ export async function cancelWinfrRecovery(
 
   const operation = activeRecovery;
 
+  operation.cancelRequested = true;
 
   let cancelled = false;
 

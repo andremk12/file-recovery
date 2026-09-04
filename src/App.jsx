@@ -7,7 +7,7 @@ import {
 
 import AppLayout from "./components/layout/AppLayout"
 import History from "./pages/History"
-import Home from "./pages/Home"
+import Home from "./pages/home/Home"
 import Scan from "./pages/scan/Scan"
 import Settings from "./pages/Settings"
 
