@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld("desktopAPI", {
     startRealRecovery: (request) => ipcRenderer.invoke("recovery:start-real", request),
     cancelRealRecovery: (recoveryId) => ipcRenderer.invoke("recovery:cancel-real", recoveryId),
     getActiveRealRecovery: () => ipcRenderer.invoke("recovery:get-active-real"),
+    notifyRecoveryFinished: (notificationData) => ipcRenderer.invoke("recovery:notify-finished", notificationData),
     onRealRecoveryUpdate: (callback) => {
             if (typeof callback !== "function") {
                 throw new TypeError(

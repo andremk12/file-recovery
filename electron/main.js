@@ -6,6 +6,8 @@ import { registerDestinationIpc } from "./ipc/destinationIpc.js";
 import { registerScanIpc } from "./ipc/scanIpc.js";
 import { registerRecoveryEngineIpc } from "./ipc/recoveryEngineIpc.js";
 import { registerShellIpc } from "./ipc/shellIpc.js";
+import { registerNotificationIpc } from "./ipc/notificationIpc.js";
+import { getAdministratorStatus } from "./services/administratorService.js";
 import os from "node:os"
 
 
@@ -50,20 +52,43 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  ipcMain.handle("app:get-info", () => {
+  
+  if (process.platform === "win32") {
+  app.setAppUserModelId(
+    "com.andremichalsky.file-recovery",
+  );
+}
+
+ ipcMain.handle(
+  "app:get-info",
+  async () => {
+    const administratorStatus =
+      await getAdministratorStatus();
+
     return {
-      version: app.getVersion(),
-      platform: process.platform,
-      electronVersion: process.versions.electron,
-      userName: os.userInfo().username
+      version:
+        app.getVersion(),
+
+      platform:
+        process.platform,
+
+      electronVersion:
+        process.versions.electron,
+
+      userName:
+        os.userInfo().username,
+
+      administratorStatus,
     };
-  });
+  },
+);
 
   registerDriveIpc();
   registerDestinationIpc();
   registerScanIpc();
   registerRecoveryEngineIpc();
   registerShellIpc();
+  registerNotificationIpc();
 
 
   createWindow();

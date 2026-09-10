@@ -208,9 +208,20 @@ function Home() {
       appInfo?.userName,
     );
 
-  const isEngineAvailable =
-    recoveryEngineStatus?.available ===
-    true;
+const isEngineAvailable = recoveryEngineStatus?.available === true;
+
+const administratorStatus = appInfo?.administratorStatus;
+
+const isAdministrator = administratorStatus?.isAdministrator === true;
+
+const administratorCheckFailed = Boolean(appInfo) && administratorStatus?.checked === false;
+
+const shouldShowAdministratorWarning =
+  !isLoading &&
+  Boolean(appInfo) &&
+  administratorStatus
+    ?.supported !== false &&
+  !isAdministrator;
 
   const environmentChecks = [
     {
@@ -223,6 +234,11 @@ function Home() {
         "Windows File Recovery disponível",
       completed: isEngineAvailable,
     },
+      {
+    label:
+      "Executando como administrador",
+    completed: isAdministrator,
+  },
   ];
 
   const completedChecks =
@@ -347,6 +363,41 @@ function Home() {
           <span>{error}</span>
         </div>
       )}
+
+      {shouldShowAdministratorWarning && (
+          <div
+            className="administrator-warning"
+            role="alert"
+          >
+            <div className="administrator-warning-icon">
+              <AlertTriangle
+                size={24}
+                aria-hidden="true"
+              />
+            </div>
+
+            <div className="administrator-warning-content">
+              <strong>
+                {administratorCheckFailed
+                  ? "Não foi possível verificar os privilégios"
+                  : "Inicie o aplicativo como administrador"}
+              </strong>
+
+              <p>
+                {administratorCheckFailed
+                  ? administratorStatus?.reason
+                  : "O Windows File Recovery precisa de privilégios administrativos para acessar o disco e executar recuperações corretamente."}
+              </p>
+
+              <span>
+                Feche o aplicativo, clique com o
+                botão direito no atalho ou terminal
+                e selecione “Executar como
+                administrador”.
+              </span>
+            </div>
+          </div>
+        )}
 
       <div className="home-content-grid">
         <div className="home-main-column">

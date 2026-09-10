@@ -346,9 +346,10 @@ function Scan() {
 
     const [ liveElapsedMs, setLiveElapsedMs] = useState(0);
 
-const activeRecoveryIdRef = useRef(null);
+    const activeRecoveryIdRef = useRef(null);
 
-const openedDestinationRecoveryIdRef = useRef(null);
+    const openedDestinationRecoveryIdRef = useRef(null);
+    const notifiedRecoveryIdRef = useRef(null);
 
 
     useEffect(() => {
@@ -893,7 +894,56 @@ const handleRecoveryUpdate =
     if (update.type === "cancelled") {
       setScanError("");
     }
-  }, [appSettings.openDestinationAfterRecovery,]);
+
+    const isTerminalUpdate = [
+  "completed",
+  "failed",
+  "cancelled",
+].includes(update.type);
+
+const canNotify =
+  isTerminalUpdate &&
+  appSettings.notifyWhenFinished &&
+  typeof window.desktopAPI
+    ?.notifyRecoveryFinished ===
+    "function" &&
+  notifiedRecoveryIdRef.current !==
+    update.recoveryId;
+
+if (canNotify) {
+  /*
+   * Marca antes da Promise para impedir
+   * notificações duplicadas.
+   */
+  notifiedRecoveryIdRef.current =
+    update.recoveryId;
+
+  void window.desktopAPI
+    .notifyRecoveryFinished({
+      status: update.type,
+
+      filesFound:
+        Number.isFinite(
+          update.filesFound,
+        )
+          ? update.filesFound
+          : 0,
+    })
+    .then((notificationResult) => {
+      console.log(
+        "[Recovery notification]",
+        notificationResult,
+      );
+    })
+    .catch((notificationError) => {
+      console.error(
+        "Não foi possível exibir a notificação:",
+        notificationError,
+      );
+    });
+}
+
+  }, [appSettings.openDestinationAfterRecovery, appSettings.notifyWhenFinished]);
 
 
  useEffect(() => {
@@ -1133,17 +1183,25 @@ async function executeRealRecovery() {
 
   setIsRecoveryConfirmationOpen(false);
 
+  /*
+   * Libera as ações automáticas para
+   * esta nova recuperação.
+   */
+  openedDestinationRecoveryIdRef.current =
+    null;
+
+  notifiedRecoveryIdRef.current =
+    null;
+
   const startedAt = Date.now();
 
   setRecoveryStartedAt(startedAt);
   setLiveElapsedMs(0);
 
-  openedDestinationRecoveryIdRef.current = null;
-  
   setShowScanResults(false);
   setIsScanModalOpen(true);
   setScanError("");
-
+  
   setScanState({
     ...INITIAL_SCAN_STATE,
     status: "starting",
