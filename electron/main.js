@@ -5,6 +5,7 @@ import { registerDriveIpc } from "./ipc/driveIpc.js"
 import { registerDestinationIpc } from "./ipc/destinationIpc.js";
 import { registerScanIpc } from "./ipc/scanIpc.js";
 import { registerRecoveryEngineIpc } from "./ipc/recoveryEngineIpc.js";
+import { registerShellIpc } from "./ipc/shellIpc.js";
 import os from "node:os"
 
 
@@ -61,7 +62,9 @@ app.whenReady().then(() => {
   registerDriveIpc();
   registerDestinationIpc();
   registerScanIpc();
-  registerRecoveryEngineIpc()
+  registerRecoveryEngineIpc();
+  registerShellIpc();
+
 
   createWindow();
 

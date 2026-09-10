@@ -215,7 +215,7 @@ let recoveryFoldersBefore = [];
   let lastProgress = 0;
   let finalized = false;
   let interactionBuffer = "";
-  let keepBothResponseSent = false;
+  let duplicateResponseSent = false;
 
   const operation = {
     recoveryId,
@@ -237,8 +237,7 @@ let recoveryFoldersBefore = [];
       ...update,
     });
   }
-
-  function handleInteractivePrompt(
+function handleInteractivePrompt(
   decodedOutput,
 ) {
   interactionBuffer = (
@@ -256,7 +255,7 @@ let recoveryFoldersBefore = [];
 
   if (
     !isOverwritePrompt ||
-    keepBothResponseSent
+    duplicateResponseSent
   ) {
     return;
   }
@@ -273,14 +272,38 @@ let recoveryFoldersBefore = [];
     return;
   }
 
-  keepBothResponseSent = true;
+  const allowedResponses = [
+    "a",
+    "n",
+    "b",
+  ];
+
+  const promptResponse =
+    allowedResponses.includes(
+      command.duplicatePromptResponse,
+    )
+      ? command.duplicatePromptResponse
+      : "b";
+
+  const responseMessages = {
+    a:
+      "Arquivos repetidos encontrados. Substituindo os arquivos existentes.",
+
+    n:
+      "Arquivos repetidos encontrados. Ignorando os arquivos duplicados.",
+
+    b:
+      "Arquivos repetidos encontrados. Mantendo todas as versões.",
+  };
+
+  duplicateResponseSent = true;
   interactionBuffer = "";
 
   childProcess.stdin.write(
-    "b\r\n",
+    `${promptResponse}\r\n`,
     (inputError) => {
       if (inputError) {
-        keepBothResponseSent = false;
+        duplicateResponseSent = false;
 
         emit({
           type: "output",
@@ -298,7 +321,9 @@ let recoveryFoldersBefore = [];
         status: "running",
         progress: lastProgress,
         message:
-          "Arquivos repetidos encontrados. Mantendo todas as versões.",
+          responseMessages[
+            promptResponse
+          ],
       });
     },
   );
@@ -544,6 +569,8 @@ try {
 
     recoveryFolders:
       recoveredResults.recoveryFolders,
+
+      
 
     filesRecoveredByEngine: recoveredResults.filesRecoveredByEngine,
     filesFilteredOut: recoveredResults.filesFilteredOut,

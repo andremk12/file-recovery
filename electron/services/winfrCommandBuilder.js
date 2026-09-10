@@ -5,6 +5,13 @@ const ALLOWED_MODES = new Set([
   "extensive",
 ]);
 
+const DUPLICATE_POLICY_OPTIONS =
+  Object.freeze({
+    keepBoth: "b",
+    skip: "n",
+    overwrite: "a",
+  });
+
 function normalizeDrive(value, label) {
   const normalized =
     typeof value === "string"
@@ -86,6 +93,39 @@ function normalizeSourceFolder(
 
   return `\\${normalized}\\`;
 }
+
+function normalizeDuplicatePolicy(
+  value,
+) {
+  const normalized =
+    typeof value === "string"
+      ? value.trim()
+      : "";
+
+  /*
+   * Mantém compatibilidade com requests
+   * antigos que ainda não enviam essa
+   * configuração.
+   */
+  if (!normalized) {
+    return "keepBoth";
+  }
+
+  const isAllowed =
+    Object.prototype.hasOwnProperty.call(
+      DUPLICATE_POLICY_OPTIONS,
+      normalized,
+    );
+
+  if (!isAllowed) {
+    throw new Error(
+      "A política de arquivos duplicados é inválida.",
+    );
+  }
+
+  return normalized;
+}
+
 
 function normalizeDestinationPath(value) {
   const rawValue =
@@ -191,6 +231,17 @@ if (!ALLOWED_MODES.has(mode)) {
   );
 }
 
+const duplicatePolicy =
+  normalizeDuplicatePolicy(
+    request.duplicatePolicy,
+  );
+
+const duplicatePromptResponse =
+  DUPLICATE_POLICY_OPTIONS[
+    duplicatePolicy
+  ];
+
+
 if (sourceDrive === destinationDrive) {
   throw new Error(
     "A origem e o destino não podem estar no mesmo volume.",
@@ -237,6 +288,12 @@ const args = [
   "/a",
 ];
 
+if (mode === "regular") {
+  args.push(
+    `/o:${duplicatePromptResponse}`,
+  );
+}
+
 for (const filter of engineFilters) {
   args.push("/n", filter);
 }
@@ -258,6 +315,8 @@ return {
   mode,
   filters: engineFilters,
   resultFilters: extensionFilters,
+  duplicatePolicy,
+  duplicatePromptResponse,
 
   displayCommand: [
     "winfr.exe",

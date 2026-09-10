@@ -58,6 +58,12 @@ contextBridge.exposeInMainWorld("desktopAPI", {
         }
     },
 
+    openFolder: (folderPath) =>
+        ipcRenderer.invoke(
+            "shell:open-folder",
+            folderPath,
+  ),
+
     selectSourceFolder: () =>
     ipcRenderer.invoke(
     "recovery:select-source-folder",

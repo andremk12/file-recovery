@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState, useRef} from "react";
 import { HardDrive, RefreshCw, CheckCircle2, FolderOpen, AlertTriangle, XCircle, X, Search, FileText, Settings2} from "lucide-react";
+import { loadAppSettings } from "../../services/appSettings"
+
 import "./Scan.css"
 
 const DRIVE_TYPE_LABELS = {
@@ -10,6 +12,17 @@ const DRIVE_TYPE_LABELS = {
     ram: "Disco em memória",
     unknown: "Tipo desconhecido"
 }
+
+const DUPLICATE_POLICY_LABELS = {
+  keepBoth:
+    "Manter as duas versões",
+
+  skip:
+    "Ignorar arquivos duplicados",
+
+  overwrite:
+    "Substituir arquivos existentes",
+};
 
 const INITIAL_SCAN_STATE = {
   scanId: null,
@@ -226,6 +239,72 @@ function getAutomaticRecoveryMode(drive) {
     : "extensive";
 }
 
+function resolveRecoveryMode(
+  configuredMode,
+  drive,
+) {
+  const automaticMode =
+    getAutomaticRecoveryMode(drive);
+
+  /*
+   * FAT32, exFAT ou outro sistema
+   * diferente de NTFS sempre exige
+   * o modo Extensivo.
+   */
+  if (automaticMode === "extensive") {
+    return "extensive";
+  }
+
+  /*
+   * Em NTFS, respeita a configuração
+   * escolhida pelo usuário.
+   */
+  if (configuredMode === "extensive") {
+    return "extensive";
+  }
+
+  return "regular";
+}
+
+
+function getRecoveryFolderToOpen(
+  update,
+) {
+  const recoveryFolders =
+    Array.isArray(
+      update?.recoveryFolders,
+    )
+      ? update.recoveryFolders.filter(
+          (folderPath) =>
+            typeof folderPath ===
+              "string" &&
+            folderPath.trim(),
+        )
+      : [];
+
+  /*
+   * Quando uma única pasta Recovery_
+   * foi identificada, abrimos exatamente
+   * essa pasta.
+   */
+  if (recoveryFolders.length === 1) {
+    return recoveryFolders[0];
+  }
+
+  /*
+   * Se nenhuma ou várias pastas forem
+   * identificadas, abrimos o destino base.
+   */
+  if (
+    typeof update?.destinationFolder ===
+      "string" &&
+    update.destinationFolder.trim()
+  ) {
+    return update.destinationFolder;
+  }
+
+  return null;
+}
 
 
 function Scan() {
@@ -243,13 +322,17 @@ function Scan() {
 
     
     const [isScanModalOpen, setIsScanModalOpen] = useState(false);
+    const [isRecoveryConfirmationOpen, setIsRecoveryConfirmationOpen] = useState(false)
     const [showScanResults, setShowScanResults,] = useState(false)
 
+    const [appSettings] = useState(() => loadAppSettings(),);
 
-    const [recoveryMode, setRecoveryMode] = useState("regular");
+
+    const [recoveryMode, setRecoveryMode] = 
+        useState(() => appSettings.defaultRecoveryMode === "extensive" ? "extensive" : "regular");
+    const [recoveryFileGroup, setRecoveryFileGroup] = useState(() => appSettings.defaultFileGroup)
 
     const [recoveryCommandPreview, setRecoveryCommandPreview] = useState(null)
-    const [recoveryFileGroup, setRecoveryFileGroup] = useState("all")
     const [recoveryCommandError, setRecoveryCommandError] = useState("")
     const [isPreparingRecovery, setIsPreparingRecovery] = useState(false)
 
@@ -264,6 +347,10 @@ function Scan() {
     const [ liveElapsedMs, setLiveElapsedMs] = useState(0);
 
 const activeRecoveryIdRef = useRef(null);
+
+const openedDestinationRecoveryIdRef = useRef(null);
+
+
     useEffect(() => {
   let disposed = false;
 
@@ -582,6 +669,9 @@ function handleClearSourceFolder() {
 
     setRecoveryCommandPreview(preview);
     setIsRecoveryConfigModalOpen(false);
+
+    console.log("[WinFR preview]",preview,);
+
   } catch (preparationError) {
     setRecoveryCommandError(
       preparationError instanceof Error
@@ -602,11 +692,12 @@ function handleClearSourceFolder() {
         setDestinationPath("");
         setDestinationError("");
         setDestinationWarning("");
+        setIsRecoveryConfirmationOpen(false);
 
         setRecoveryCommandPreview(null);
         setRecoveryCommandError("");
-        setRecoveryMode("regular");
-        setRecoveryFileGroup("all");
+        setRecoveryMode(appSettings.defaultRecoveryMode === "extensive" ? "extensive ":"regular");
+        setRecoveryFileGroup(appSettings.defaultFileGroup);
         setIsRecoveryConfigModalOpen(false);
 
          setRecoverySourceFolder("");
@@ -651,7 +742,7 @@ function handleClearSourceFolder() {
         } finally {
             setIsLoading(false)
         }
-    }, [])
+    }, [appSettings.defaultRecoveryMode, appSettings.defaultFileGroup])
 
     useEffect(() => {
         loadDrives()
@@ -758,9 +849,39 @@ const handleRecoveryUpdate =
       );
     }
 
-    if (update.type === "completed") {
-      setShowScanResults(true);
-    }
+   if (update.type === "completed") {
+  setShowScanResults(true);
+
+  const folderToOpen =
+    getRecoveryFolderToOpen(update);
+
+  const canOpenDestination =
+    appSettings
+      .openDestinationAfterRecovery &&
+    typeof window.desktopAPI
+      ?.openFolder === "function" &&
+    folderToOpen &&
+    openedDestinationRecoveryIdRef
+      .current !== update.recoveryId;
+
+  if (canOpenDestination) {
+    /*
+     * Marcamos antes da chamada assíncrona
+     * para impedir duas aberturas.
+     */
+    openedDestinationRecoveryIdRef
+      .current = update.recoveryId;
+
+    void window.desktopAPI
+      .openFolder(folderToOpen)
+      .catch((openError) => {
+        console.error(
+          "Não foi possível abrir a pasta da recuperação:",
+          openError,
+        );
+      });
+  }
+}
 
     if (update.type === "failed") {
       setScanError(
@@ -772,7 +893,7 @@ const handleRecoveryUpdate =
     if (update.type === "cancelled") {
       setScanError("");
     }
-  }, []);
+  }, [appSettings.openDestinationAfterRecovery,]);
 
 
  useEffect(() => {
@@ -844,6 +965,9 @@ function createRecoveryRequest() {
       requiresExtensiveMode
         ? "extensive"
         : recoveryMode,
+
+
+    duplicatePolicy: appSettings.duplicatePolicy,
 
     filters:
       [...selectedGroup.filters],
@@ -932,11 +1056,13 @@ function handleSelectDrive(driveId) {
   }
 
   setRecoveryMode(
-    getAutomaticRecoveryMode(drive)
+      resolveRecoveryMode(
+        appSettings.defaultRecoveryMode, drive
+      )
   );
 }
 
-async function handleStartScan() {
+function handleStartScan() {
   if (!canStartScan) {
     setScanError(
       "Selecione a origem, o destino e configure a recuperação.",
@@ -945,7 +1071,10 @@ async function handleStartScan() {
     return;
   }
 
-  if (!window.desktopAPI?.startRealRecovery) {
+  if (
+    !window.desktopAPI
+      ?.startRealRecovery
+  ) {
     setScanError(
       "A recuperação real não está disponível.",
     );
@@ -953,11 +1082,64 @@ async function handleStartScan() {
     return;
   }
 
+  if (
+    appSettings.confirmBeforeRecovery
+  ) {
+    setIsRecoveryConfirmationOpen(
+      true,
+    );
+
+    return;
+  }
+
+  void executeRealRecovery();
+}
+
+function handleCloseRecoveryConfirmation() {
+  setIsRecoveryConfirmationOpen(false);
+}
+
+function handleConfirmRecovery() {
+  void executeRealRecovery();
+}
+
+async function executeRealRecovery() {
+  if (!canStartScan) {
+    setIsRecoveryConfirmationOpen(
+      false,
+    );
+
+    setScanError(
+      "A configuração da recuperação não é mais válida.",
+    );
+
+    return;
+  }
+
+  if (
+    !window.desktopAPI
+      ?.startRealRecovery
+  ) {
+    setIsRecoveryConfirmationOpen(
+      false,
+    );
+
+    setScanError(
+      "A recuperação real não está disponível.",
+    );
+
+    return;
+  }
+
+  setIsRecoveryConfirmationOpen(false);
+
   const startedAt = Date.now();
 
   setRecoveryStartedAt(startedAt);
   setLiveElapsedMs(0);
 
+  openedDestinationRecoveryIdRef.current = null;
+  
   setShowScanResults(false);
   setIsScanModalOpen(true);
   setScanError("");
@@ -965,56 +1147,61 @@ async function handleStartScan() {
   setScanState({
     ...INITIAL_SCAN_STATE,
     status: "starting",
-    message: "Iniciando a recuperação...",
+    message:
+      "Iniciando a recuperação...",
   });
 
-    try {
+  try {
     const request =
-        createRecoveryRequest();
+      createRecoveryRequest();
 
     /*
-    * Libera a adoção do ID enviado pelo
-    * próximo evento da recuperação.
-    */
-    activeRecoveryIdRef.current = null;
+     * Libera a adoção do ID enviado
+     * pelo próximo evento.
+     */
+    activeRecoveryIdRef.current =
+      null;
 
     const startedRecovery =
-        await window.desktopAPI
+      await window.desktopAPI
         .startRealRecovery(request);
 
     activeRecoveryIdRef.current =
-        startedRecovery.recoveryId;
+      startedRecovery.recoveryId;
 
-    setScanState((currentState) => ({
+    setScanState(
+      (currentState) => ({
         ...currentState,
 
         scanId:
-        startedRecovery.recoveryId,
+          startedRecovery.recoveryId,
 
         status:
-        startedRecovery.status ??
-        "starting",
+          startedRecovery.status ??
+          "starting",
 
         progress:
-        startedRecovery.progress ?? 0,
+          startedRecovery.progress ??
+          0,
 
         message:
-        "Windows File Recovery iniciado.",
-    }));
-    } catch (startError) {
+          "Windows File Recovery iniciado.",
+      }),
+    );
+  } catch (startError) {
     const message =
-        startError instanceof Error
+      startError instanceof Error
         ? startError.message
         : "Não foi possível iniciar a recuperação.";
 
     setScanState({
-        ...INITIAL_SCAN_STATE,
-        status: "failed",
-        message,
+      ...INITIAL_SCAN_STATE,
+      status: "failed",
+      message,
     });
 
     setScanError(message);
-    }
+  }
 }
 
 async function handleCancelScan() {
@@ -1195,6 +1382,46 @@ useEffect(() => {
   requiresExtensiveMode,
   recoveryMode,
 ]);
+
+useEffect(() => {
+  if (
+    !isRecoveryConfirmationOpen
+  ) {
+    return undefined;
+  }
+
+  const previousOverflow =
+    document.body.style.overflow;
+
+  function handleKeyDown(event) {
+    if (event.key === "Escape") {
+      setIsRecoveryConfirmationOpen(
+        false,
+      );
+    }
+  }
+
+  document.body.style.overflow =
+    "hidden";
+
+  window.addEventListener(
+    "keydown",
+    handleKeyDown,
+  );
+
+  return () => {
+    document.body.style.overflow =
+      previousOverflow;
+
+    window.removeEventListener(
+      "keydown",
+      handleKeyDown,
+    );
+  };
+}, [isRecoveryConfirmationOpen]);
+
+
+
     return (
         <section className="page">
             <header className="scan-header">
@@ -1530,7 +1757,176 @@ useEffect(() => {
                                         </div>
                                         )}
 
+                                  {isRecoveryConfirmationOpen && (
+                                    <div
+                                      className="scan-modal-backdrop"
+                                      onMouseDown={(event) => {
+                                        if (
+                                          event.target ===
+                                          event.currentTarget
+                                        ) {
+                                          handleCloseRecoveryConfirmation();
+                                        }
+                                      }}
+                                    >
+                                      <section
+                                        className="
+                                          recovery-config-modal
+                                          recovery-confirmation-modal
+                                        "
+                                        role="dialog"
+                                        aria-modal="true"
+                                        aria-labelledby="
+                                          recovery-confirmation-title
+                                        "
+                                      >
+                                        <header className="scan-modal-header">
+                                          <div className="scan-modal-heading">
+                                            <div className="scan-modal-icon">
+                                              <Search
+                                                size={24}
+                                                aria-hidden="true"
+                                              />
+                                            </div>
 
+                                            <div>
+                                              <h2
+                                                id="
+                                                  recovery-confirmation-title
+                                                "
+                                              >
+                                                Confirmar recuperação
+                                              </h2>
+
+                                              <p>
+                                                Confira os dados antes de
+                                                iniciar o Windows File
+                                                Recovery.
+                                              </p>
+                                            </div>
+                                          </div>
+
+                                          <button
+                                            type="button"
+                                            className="scan-modal-close"
+                                            onClick={
+                                              handleCloseRecoveryConfirmation
+                                            }
+                                            aria-label="
+                                              Fechar confirmação
+                                            "
+                                          >
+                                            <X
+                                              size={20}
+                                              aria-hidden="true"
+                                            />
+                                          </button>
+                                        </header>
+
+                                        <div className="recovery-confirmation-summary">
+                                          <div className="confirmation-item">
+                                            <span>Disco de origem</span>
+                                            <strong>
+                                              {selectedDrive?.letter}
+                                            </strong>
+                                          </div>
+
+                                          <div className="confirmation-item">
+                                            <span>Sistema de arquivos</span>
+                                            <strong>
+                                              {selectedFileSystem ||
+                                                "Não identificado"}
+                                            </strong>
+                                          </div>
+
+                                          <div className="confirmation-item is-full">
+                                            <span>Pasta de origem</span>
+                                            <strong>
+                                              {recoverySourceFolder}
+                                            </strong>
+                                          </div>
+
+                                          <div className="confirmation-item is-full">
+                                            <span>Destino</span>
+                                            <strong>
+                                              {destinationPath}
+                                            </strong>
+                                          </div>
+
+                                          <div className="confirmation-item">
+                                            <span>Modo</span>
+                                            <strong>
+                                              {requiresExtensiveMode ||
+                                              recoveryMode === "extensive"
+                                                ? "Extensivo"
+                                                : "Regular"}
+                                            </strong>
+                                          </div>
+
+                                          <div className="confirmation-item">
+                                            <span>Tipos de arquivo</span>
+                                            <strong>
+                                              {RECOVERY_FILE_GROUPS[
+                                                recoveryFileGroup
+                                              ]?.label ??
+                                                "Todos os arquivos"}
+                                            </strong>
+                                          </div>
+
+                                          <div className="confirmation-item is-full">
+                                            <span>Arquivos duplicados</span>
+
+                                            <strong>
+                                              {DUPLICATE_POLICY_LABELS[
+                                                appSettings.duplicatePolicy
+                                              ] ?? "Manter as duas versões"}
+                                            </strong>
+                                          </div>
+
+                                        </div>
+
+                                        <div className="recovery-confirmation-warning">
+                                          <AlertTriangle
+                                            size={20}
+                                            aria-hidden="true"
+                                          />
+
+                                          <p>
+                                            Evite salvar ou criar arquivos
+                                            no disco de origem durante a
+                                            recuperação.
+                                          </p>
+                                        </div>
+
+                                        <footer className="recovery-config-actions">
+                                          <button
+                                            type="button"
+                                            className="modal-secondary-button"
+                                            onClick={
+                                              handleCloseRecoveryConfirmation
+                                            }
+                                          >
+                                            Voltar
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            className="prepare-recovery-button"
+                                            onClick={
+                                              handleConfirmRecovery
+                                            }
+                                          >
+                                            <Search
+                                              size={18}
+                                              aria-hidden="true"
+                                            />
+
+                                            Confirmar e iniciar
+                                          </button>
+                                        </footer>
+                                      </section>
+                                    </div>
+                                  )}
          {isScanModalOpen && (
             <div
                 className="scan-modal-backdrop"
