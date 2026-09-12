@@ -1569,3 +1569,125 @@
     grid-column: auto;
   }
 }
+
+.scan-technical-details {
+  display: grid;
+  gap: 13px;
+  margin-top: 15px;
+  padding: 15px;
+  background:
+    linear-gradient(
+      145deg,
+      #f8fafc,
+      #f5f3ff
+    );
+  border: 1px solid #ddd6fe;
+  border-radius: 12px;
+}
+
+.scan-technical-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  color: #4338ca;
+}
+
+.scan-technical-header svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.scan-technical-header strong,
+.scan-technical-header span {
+  display: block;
+}
+
+.scan-technical-header strong {
+  color: #312e81;
+  font-size: 13px;
+}
+
+.scan-technical-header span {
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.scan-technical-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.scan-technical-grid > div {
+  min-width: 0;
+  padding: 10px 11px;
+  background-color:
+    rgb(255 255 255 / 72%);
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.scan-technical-grid > div.is-full {
+  grid-column: 1 / -1;
+}
+
+.scan-technical-grid dt {
+  color: #64748b;
+  font-size: 10px;
+}
+
+.scan-technical-grid dd {
+  margin: 4px 0 0;
+  overflow: hidden;
+  color: #1e293b;
+  font-family:
+    "Cascadia Code",
+    Consolas,
+    monospace;
+  font-size: 11px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scan-technical-command {
+  display: grid;
+  gap: 6px;
+}
+
+.scan-technical-command span {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.scan-technical-command code {
+  display: block;
+  max-height: 90px;
+  padding: 10px;
+  overflow: auto;
+  color: #c4b5fd;
+  background-color: #172033;
+  border-radius: 8px;
+  font-family:
+    "Cascadia Code",
+    Consolas,
+    monospace;
+  font-size: 10px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 600px) {
+  .scan-technical-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .scan-technical-grid > div.is-full {
+    grid-column: auto;
+  }
+}

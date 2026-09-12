@@ -646,6 +646,24 @@ const shouldShowAdministratorWarning =
                 </dd>
               </div>
 
+              <dt>Privilégios</dt>
+
+              <dd
+                className={
+                  isAdministrator
+                    ? "is-administrator"
+                    : "is-standard-user"
+                }
+              >
+                {isLoading
+                  ? "..."
+                  : isAdministrator
+                    ? "Administrador"
+                    : administratorCheckFailed
+                      ? "Não verificado"
+                      : "Usuário padrão"}
+              </dd>
+
               <div>
                 <dt>Electron</dt>
                 <dd>

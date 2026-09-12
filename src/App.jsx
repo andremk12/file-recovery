@@ -6,10 +6,11 @@ import {
 } from "react-router-dom"
 
 import AppLayout from "./components/layout/AppLayout"
-import History from "./pages/History"
+import History from "./pages/history/History"
 import Home from "./pages/home/Home"
 import Scan from "./pages/scan/Scan"
 import Settings from "./pages/settings/Settings"
+
 
 function App() {
     return (

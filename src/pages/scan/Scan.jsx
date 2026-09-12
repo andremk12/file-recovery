@@ -145,6 +145,21 @@ function formatElapsedTime(milliseconds) {
     return minutes > 0 ? `${minutes}min ${seconds}s` : `${seconds}s`
 }
 
+function formatTechnicalDuration(milliseconds) {
+  if (
+    !Number.isFinite(milliseconds) ||
+    milliseconds < 0
+  ) {
+    return "Aguardando...";
+  }
+
+  if (milliseconds < 1000) {
+    return `${Math.round(milliseconds)} ms`;
+  }
+
+  return `${(milliseconds / 1000).toFixed(2)} s`;
+}
+
 
 function formatBytes(bytes) {
     if (bytes === null || bytes === undefined) {
@@ -697,7 +712,7 @@ function handleClearSourceFolder() {
 
         setRecoveryCommandPreview(null);
         setRecoveryCommandError("");
-        setRecoveryMode(appSettings.defaultRecoveryMode === "extensive" ? "extensive ":"regular");
+        setRecoveryMode(appSettings.defaultRecoveryMode === "extensive" ? "extensive" : "regular");
         setRecoveryFileGroup(appSettings.defaultFileGroup);
         setIsRecoveryConfigModalOpen(false);
 
@@ -2171,6 +2186,96 @@ useEffect(() => {
                         </strong>
                     </div>
                     </div>
+
+                    {appSettings.showTechnicalDetails && (
+                          <section
+                            className="scan-technical-details"
+                            aria-labelledby="scan-technical-title"
+                          >
+                            <header className="scan-technical-header">
+                              <Settings2
+                                size={17}
+                                aria-hidden="true"
+                              />
+
+                              <div>
+                                <strong id="scan-technical-title">
+                                  Detalhes técnicos
+                                </strong>
+
+                                <span>
+                                  Informações internas da execução.
+                                </span>
+                              </div>
+                            </header>
+
+                            <dl className="scan-technical-grid">
+                              <div>
+                                <dt>Status interno</dt>
+                                <dd>{scanState.status}</dd>
+                              </div>
+
+                              <div>
+                                <dt>ID da recuperação</dt>
+                                <dd title={scanState.scanId ?? ""}>
+                                  {scanState.scanId ??
+                                    "Aguardando..."}
+                                </dd>
+                              </div>
+
+                              <div>
+                                <dt>Tempo do WinFR</dt>
+                                <dd>
+                                  {formatTechnicalDuration(
+                                    scanState.timings?.engineMs,
+                                  )}
+                                </dd>
+                              </div>
+
+                              <div>
+                                <dt>Indexação dos resultados</dt>
+                                <dd>
+                                  {formatTechnicalDuration(
+                                    scanState.timings
+                                      ?.resultIndexMs,
+                                  )}
+                                </dd>
+                              </div>
+
+                              <div className="is-full">
+                                <dt>Pasta de origem</dt>
+                                <dd title={recoverySourceFolder}>
+                                  {recoverySourceFolder ||
+                                    "Não selecionada"}
+                                </dd>
+                              </div>
+
+                              <div className="is-full">
+                                <dt>Pasta de destino</dt>
+                                <dd title={destinationPath}>
+                                  {destinationPath ||
+                                    "Não selecionada"}
+                                </dd>
+                              </div>
+                            </dl>
+
+                            {recoveryCommandPreview
+                              ?.displayCommand && (
+                              <div className="scan-technical-command">
+                                <span>Comando do WinFR</span>
+
+                                <code>
+                                  {
+                                    recoveryCommandPreview
+                                      .displayCommand
+                                  }
+                                </code>
+                              </div>
+                            )}
+                          </section>
+                        )}
+
+
             </div>
          )}
 
