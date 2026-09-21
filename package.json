@@ -11,7 +11,8 @@
     "electron": "electron .",
     "desktop": "concurrently -k \"npm run dev\" \"wait-on http://localhost:5173 && npm run electron\"",
     "check": "npm run lint && npm run build",
-    "lint": "oxlint src electron vite.config.js"
+    "lint": "oxlint src electron vite.config.js",
+    "test": "node --experimental-test-module-mocks --test electron/tests/*.test.js"
 
   },
   "dependencies": {

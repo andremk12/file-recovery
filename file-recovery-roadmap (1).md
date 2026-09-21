@@ -2,7 +2,7 @@
 
 Aplicativo desktop para recuperação de arquivos no Windows, desenvolvido com Electron, React e integração com o Windows File Recovery (WinFR).
 
-Última atualização: 8 de setembro de 2026.
+Última atualização: 21 de setembro de 2026.
 
 ## 1. Detecção e seleção de discos — concluído
 
@@ -35,20 +35,40 @@ Aplicativo desktop para recuperação de arquivos no Windows, desenvolvido com E
 - [x] Selecionar e normalizar a pasta de origem na interface
 - [x] Restaurar uma operação ativa
 - [x] Cancelar a recuperação
-- [x] Forçar o modo Extensivo para FAT32
-- [ ] Corrigir a restrição por pasta de origem no comando do WinFR
-- [ ] Combinar corretamente pasta de origem e extensão no argumento `/n`
-- [ ] Validar que a recuperação restrita não traga arquivos de todo o volume
+- [x] Forçar o modo Extensivo para sistemas de arquivos diferentes de NTFS, incluindo FAT32
+- [x] Corrigir a construção da restrição por pasta de origem no comando do WinFR (testes automatizados; precisão real pendente)
+- [x] Combinar corretamente pasta de origem e extensão no argumento `/n`
+- [ ] Validar que a recuperação restrita não traga arquivos de todo o volume — requer validação manual
 - [ ] Remover definitivamente listeners duplicados
-- [ ] Exibir o estado “Finalizando...” quando o progresso chegar a 99%
+- [x] Exibir a fase de organização dos resultados após o encerramento do WinFR (evento `finalizing`, progresso 100%)
 - [ ] Mapear códigos de saída, incluindo `0xC0000005`
 - [ ] Registrar a saída completa do WinFR em log
-- [ ] Identificar a pasta `Recovery_<data e hora>` criada pelo WinFR
+- [x] Identificar a pasta `Recovery_<data e hora>` criada pelo WinFR usando snapshot do destino
 - [ ] Validar os cenários finais:
   - [ ] Recuperação concluída com arquivos
   - [ ] Recuperação concluída sem arquivos encontrados
   - [ ] Cancelamento solicitado pelo usuário
   - [ ] Falha ou encerramento inesperado do WinFR
+
+### 4.1. Precisão da pasta de origem e filtros do WinFR
+
+Detalhes, fontes e roteiro: [diagnóstico](docs/winfr-source-folder.md) e [teste manual](docs/winfr-manual-test.md).
+
+| Item | Estado atual |
+| --- | --- |
+| Investigação do `/n`, sintaxe oficial e fluxo React → preload → IPC → spawn | Concluído; não há evidência de perda da pasta no transporte |
+| Correção da normalização (unidades, barras, UNC, travessias e raiz) | Concluído, com testes |
+| Combinação entre pasta e extensões em cada `/n` | Concluído; nunca emite extensão global |
+| Preview e execução com o mesmo construtor e array de argumentos | Concluído, com testes de integração usando processos simulados |
+| Testes automatizados de filtros, caminhos, duplicados, progresso e cancelamento | Concluído: 113 testes; nenhuma recuperação real executada |
+| Impedir inclusão de pastas de recuperações anteriores pelo fallback de 60 segundos | Concluído; regressão reproduzida antes da correção |
+| Teste manual fora do OneDrive, com arquivo externo de controle | Requer validação manual, nos modos Regular e Extensivo |
+| Teste manual dentro do OneDrive, com arquivos disponíveis localmente | Requer validação manual, nos modos Regular e Extensivo |
+| Limitações conhecidas do WinFR | Concluído: documentadas; nuvem/rede não suportadas, recuperação depende dos dados ainda disponíveis |
+| Explicação de arquivos externos gerados pelo WinFR com `/n` válido | Pendente de logs/versão e reprodução manual; não atribuído a um bug comprovado do motor |
+| Necessidade de pós-filtragem por pasta original | Requer validação manual; não implementada por falta de metadados confiáveis de origem |
+
+O pós-filtro de extensão existente foi preservado como filtro de exibição. Ele não substitui os filtros enviados ao motor nem comprova a pasta original. Nenhum teste manual foi marcado como concluído.
 
 ## 5. Interface geral e configurações — em andamento
 
@@ -62,7 +82,7 @@ Aplicativo desktop para recuperação de arquivos no Windows, desenvolvido com E
 - [x] Criar uma seção de próximos passos e engajamento
 - [x] Adicionar atalhos para histórico e configurações
 - [x] Exibir o status do Windows File Recovery
-- [ ] Informar quando forem necessárias permissões administrativas
+- [x] Informar quando forem necessárias permissões administrativas
 - [ ] Exibir a última recuperação realizada
 - [ ] Conectar os cards da Home aos dados reais de histórico e recuperação ativa
 - [ ] Criar um estado vazio baseado em dados reais para o primeiro acesso
@@ -86,14 +106,15 @@ Aplicativo desktop para recuperação de arquivos no Windows, desenvolvido com E
 - [ ] Adicionar a opção de restaurar uma operação ativa
 - [ ] Configurar a retenção dos logs
 - [ ] Disponibilizar os temas claro, escuro e sistema
-- [ ] Exibir o diagnóstico do WinFR
+- [x] Exibir o diagnóstico básico do teste do WinFR nas Configurações
 - [ ] Adicionar um botão para abrir a pasta de logs
-- [ ] Aplicar o modo e o grupo padrão na tela `Scan.jsx`
-- [ ] Aplicar a política de duplicados no comando do WinFR
-- [ ] Aplicar a confirmação antes do início da recuperação
-- [ ] Abrir automaticamente a pasta de destino quando configurado
-- [ ] Integrar notificações ao processo principal do Electron
-- [ ] Aplicar a preferência de detalhes técnicos ao modal e aos resultados
+- [x] Aplicar o modo e o grupo padrão na tela `Scan.jsx`
+- [x] Aplicar a política de duplicados: `/o` no Regular e resposta ao prompt no Extensivo
+- [x] Aplicar a confirmação antes do início da recuperação
+- [x] Abrir automaticamente a pasta de destino quando configurado
+- [x] Integrar notificações ao processo principal do Electron
+- [x] Aplicar a preferência de detalhes técnicos ao modal da recuperação
+- [ ] Ampliar detalhes técnicos nos resultados, se necessário
 
 ### 5.3. Estrutura e experiência
 
@@ -111,16 +132,16 @@ Aplicativo desktop para recuperação de arquivos no Windows, desenvolvido com E
 1. ~~Ajustar a navegação e a estrutura geral.~~
 2. ~~Construir a nova tela inicial.~~
 3. ~~Construir a tela de configurações.~~
-4. Integrar as preferências aos consumidores (`Scan.jsx`, WinFR e notificações).
+4. ~~Integrar as preferências aos consumidores (`Scan.jsx`, WinFR e notificações).~~
 5. Migrar a persistência do `localStorage` para o processo principal do Electron.
 6. Finalizar os estados visuais, a acessibilidade e a responsividade.
 
 ## 6. Resultados recuperados
 
-- [ ] Localizar automaticamente a pasta criada pelo WinFR
-- [ ] Percorrer os arquivos recuperados recursivamente
-- [ ] Indexar e normalizar os arquivos recuperados
-- [ ] Exibir os arquivos reais na tabela
+- [x] Localizar automaticamente a pasta criada pelo WinFR
+- [x] Percorrer os arquivos recuperados recursivamente
+- [x] Indexar e normalizar os arquivos recuperados (até 2.000 resultados visíveis)
+- [x] Exibir os arquivos reais na tabela
 - [ ] Adicionar pesquisa e filtros
 - [ ] Permitir abrir um arquivo
 - [ ] Permitir abrir a pasta de um arquivo
@@ -130,6 +151,7 @@ Aplicativo desktop para recuperação de arquivos no Windows, desenvolvido com E
 
 ## 7. Histórico de recuperações
 
+- [x] Criar a interface do histórico (atualmente usa `MOCK_RECOVERIES`)
 - [ ] Salvar recuperações anteriores
 - [ ] Consultar os detalhes de uma recuperação
 - [ ] Reabrir pastas de destino
@@ -137,7 +159,8 @@ Aplicativo desktop para recuperação de arquivos no Windows, desenvolvido com E
 
 ## 8. Segurança e diagnóstico
 
-- [ ] Validar e solicitar permissões administrativas
+- [x] Consultar privilégios administrativos e informar o usuário
+- [ ] Solicitar elevação administrativa automaticamente
 - [ ] Criar logs técnicos persistentes
 - [ ] Implementar tratamento centralizado de erros
 - [ ] Proteger e validar todos os canais IPC
