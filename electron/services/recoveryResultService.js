@@ -289,7 +289,6 @@ export async function collectRecoveredResults({
   destinationPath,
   destinationDrive,
   previousFolders = [],
-  startedAt = 0,
   resultFilters = []
 }) {
   const folders =
@@ -306,7 +305,7 @@ export async function collectRecoveredResults({
       ),
     );
 
-  let currentRecoveryFolders =
+  const currentRecoveryFolders =
     folders.filter(
       (folder) =>
         !previousFolderSet.has(
@@ -314,26 +313,9 @@ export async function collectRecoveredResults({
         ),
     );
 
-  // Fallback caso o WinFR reutilize ou
-  // atualize uma pasta já existente.
-  if (
-    currentRecoveryFolders.length === 0 &&
-    startedAt
-  ) {
-    currentRecoveryFolders =
-      folders.filter((folder) => {
-        const latestTimestamp =
-          Math.max(
-            folder.createdAt,
-            folder.modifiedAt,
-          );
-
-        return (
-          latestTimestamp >=
-          startedAt - 60_000
-        );
-      });
-  }
+  // O WinFR cria uma pasta Recovery_* por operação. Uma pasta do snapshot
+  // não comprova resultados desta execução, mesmo se foi alterada há segundos.
+  // Não misturar recuperações anteriores quando nenhuma pasta nova aparecer.
 
   const resultFilterSuffixes = createResultFilterSuffixes(resultFilters);
 

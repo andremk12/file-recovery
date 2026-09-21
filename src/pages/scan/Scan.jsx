@@ -1403,6 +1403,7 @@ useEffect(() => {
         recoveryMode,
         recoveryFileGroup,
         recoverySourceFolder,
+        appSettings.duplicatePolicy,
     ]);
 
     useEffect(() => {

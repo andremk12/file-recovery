@@ -25,10 +25,16 @@ function normalizeDrive(value, label) {
   return normalized;
 }
 
-function normalizeSourceFolder(
+export function normalizeSourceFolder(
   value,
   sourceDrive,
 ) {
+  const normalizedDrive = normalizeDrive(sourceDrive, "O disco de origem");
+
+  if (value != null && typeof value !== "string") {
+    throw new Error("A pasta de origem é inválida.");
+  }
+
   const rawValue =
     typeof value === "string"
       ? value.trim()
@@ -36,6 +42,18 @@ function normalizeSourceFolder(
 
   if (!rawValue) {
     return null;
+  }
+
+  const windowsPath = rawValue.replace(/\//g, "\\");
+
+  // Não reinterpretar UNC/dispositivos, C:pasta ou travessias como pastas locais.
+  if (
+    windowsPath.startsWith("\\\\") ||
+    /^[A-Z]:(?!\\)/i.test(windowsPath) ||
+    /(^|\\)\.\.(\\|$)/.test(windowsPath) ||
+    /[\0\r\n"*?<>|]/.test(windowsPath)
+  ) {
+    throw new Error("A pasta de origem é inválida. Selecione uma pasta local na unidade de origem.");
   }
 
   let relativePath;
@@ -52,7 +70,7 @@ function normalizeSourceFolder(
         .slice(0, 2)
         .toUpperCase();
 
-    if (folderDrive !== sourceDrive) {
+    if (folderDrive !== normalizedDrive) {
       throw new Error(
         "A pasta de origem não pertence ao disco selecionado.",
       );
@@ -60,7 +78,7 @@ function normalizeSourceFolder(
 
     relativePath =
       path.win32.relative(
-        `${sourceDrive}\\`,
+        `${normalizedDrive}\\`,
         absolutePath,
       );
   } else {
@@ -77,7 +95,7 @@ function normalizeSourceFolder(
       .replace(/^\\+|\\+$/g, "");
 
   if (!normalized || normalized === ".") {
-    return null;
+    throw new Error("Selecione uma pasta de origem abaixo da raiz. A recuperação no disco inteiro não está habilitada.");
   }
 
   if (
@@ -179,10 +197,10 @@ function normalizeFilters(filters) {
 
     if (
       normalized.length > 260 ||
-      /[\0\r\n"]/.test(normalized)
+      !/^\*\.[a-z\d]+(?:\.[a-z\d]+)*$/i.test(normalized)
     ) {
       throw new Error(
-        `O filtro ${index + 1} é inválido.`,
+        `O filtro ${index + 1} é inválido. Use somente extensões como *.txt, sem caminhos.`,
       );
     }
 
@@ -191,8 +209,10 @@ function normalizeFilters(filters) {
 }
 
 function quoteForDisplay(value) {
+  // Escape a barra final antes das aspas segundo a linha de comando do Windows.
+  // As aspas existem somente no preview; spawn recebe os valores originais.
   return /\s/.test(value)
-    ? `"${value}"`
+    ? `"${value.replace(/(\\+)$/g, "$1$1")}"`
     : value;
 }
 
@@ -277,9 +297,11 @@ if (!sourceFolder) {
   );
 }
 
-const engineFilters = sourceFolder
-  ? [sourceFolder]
-  : extensionFilters;
+// Cada /n é uma alternativa completa: pasta e extensão devem estar juntas.
+// Sem extensão, a Microsoft documenta a pasta com barra final (sem *.*).
+const engineFilters = extensionFilters.length > 0
+  ? extensionFilters.map((filter) => `${sourceFolder}${filter}`)
+  : [sourceFolder];
 
 const args = [
   sourceDrive,
